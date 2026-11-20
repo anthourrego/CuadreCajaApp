@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Branch;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Access;
@@ -28,11 +27,8 @@ class RoleController extends Controller
     {
         $actor = $request->user();
         abort_unless(Access::allows($actor, 'roles.manage'), 403);
-        $branches = Branch::query()
-            ->when(! $actor->isAdmin(), fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->where('roles.id', $actor->role_id)))
-            ->orderBy('name')->get(['id', 'name', 'code', 'is_active']);
 
-        return response()->json(['global' => Access::GLOBAL, 'branch' => Access::BRANCH, 'branches' => $branches]);
+        return response()->json(['global' => Access::GLOBAL, 'branch' => Access::BRANCH]);
     }
 
     public function store(Request $request): JsonResponse
@@ -42,10 +38,9 @@ class RoleController extends Controller
 
         return DB::transaction(function () use ($request, $data) {
             $actor = $this->lockedActor($request);
-            abort_unless(Access::canGrant($actor, $data['permissions'], $data['branch_ids']), 403);
+            abort_unless(Access::canGrant($actor, $data['permissions']), 403);
             $role = Role::create(['name' => $data['name'], 'guard_name' => 'web']);
             $role->syncPermissions($data['permissions']);
-            $this->syncBranches($role, $data['branch_ids']);
 
             return response()->json($this->payload($role->load('permissions')), 201);
         });
@@ -60,13 +55,12 @@ class RoleController extends Controller
             $actor = $this->lockedActor($request);
             $role = Role::whereKey($role->id)->lockForUpdate()->firstOrFail();
             abort_if($role->name === 'admin' || $role->guard_name !== 'web', 403);
-            abort_unless(Access::canDelegate($actor, $role) && Access::canGrant($actor, $data['permissions'], $data['branch_ids']), 403);
+            abort_unless(Access::canDelegate($actor, $role) && Access::canGrant($actor, $data['permissions']), 403);
             if (in_array($role->name, ['supervisor', 'cajero']) && $data['name'] !== $role->name) {
                 return response()->json(['message' => 'No se puede cambiar el nombre de un rol inicial.'], 422);
             }
             $role->update(['name' => $data['name']]);
             $role->syncPermissions($data['permissions']);
-            $this->syncBranches($role, $data['branch_ids']);
 
             return response()->json($this->payload($role->load('permissions')));
         });
@@ -81,9 +75,8 @@ class RoleController extends Controller
             $role = Role::whereKey($role->id)->lockForUpdate()->firstOrFail();
             abort_if($role->name === 'admin' || $role->guard_name !== 'web', 403);
             abort_unless(Access::canDelegate($actor, $role), 403);
-            if (User::where('role_id', $role->id)->exists()
-                || DB::table('branch_role')->where('role_id', $role->id)->exists()) {
-                return response()->json(['message' => 'No se puede eliminar un rol con usuarios o sucursales asignados.'], 422);
+            if (User::where('role_id', $role->id)->exists()) {
+                return response()->json(['message' => 'No se puede eliminar un rol con usuarios asignados.'], 422);
             }
             $role->delete();
 
@@ -97,8 +90,7 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'min:3', 'max:100', 'regex:/^[a-z0-9._-]+$/', Rule::unique('roles', 'name')->where('guard_name', 'web')->ignore($role?->id)],
             'permissions' => ['present', 'array'],
             'permissions.*' => ['required', 'string', 'distinct', Rule::in(array_keys(Access::GLOBAL + Access::BRANCH))],
-            'branch_ids' => ['present', 'array'],
-            'branch_ids.*' => ['required', 'integer', 'distinct', 'exists:branches,id'],
+            'branch_ids' => ['missing'],
         ]);
     }
 
@@ -108,17 +100,8 @@ class RoleController extends Controller
             'id' => $role->id,
             'name' => $role->name,
             'permissions' => $role->permissions->pluck('name')->values(),
-            'branch_ids' => Branch::whereHas('roles', fn ($query) => $query->whereKey($role->id))->pluck('id'),
             'users_count' => User::where('role_id', $role->id)->count(),
         ];
-    }
-
-    private function syncBranches(Role $role, array $branchIds): void
-    {
-        DB::table('branch_role')->where('role_id', $role->id)->delete();
-        foreach ($branchIds as $branchId) {
-            DB::table('branch_role')->insert(['role_id' => $role->id, 'branch_id' => $branchId]);
-        }
     }
 
     private function ensureManage(Request $request): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Branch;
 use App\Models\Role;
 use App\Models\User;
 use App\Support\Access;
@@ -36,7 +37,7 @@ class UserController extends Controller
     {
         $this->ensureManage($request);
 
-        $users = User::query()->with('role.permissions')->orderBy('name')->get()
+        $users = User::query()->with(['role.permissions', 'branches'])->orderBy('name')->get()
             ->filter(fn (User $user) => $this->canManageUser($request->user(), $user))
             ->map(fn (User $user) => $this->userPayload($user));
 
@@ -53,6 +54,8 @@ class UserController extends Controller
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:12', 'confirmed'],
             'role_id' => ['required', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'branch_ids' => ['present', 'array'],
+            'branch_ids.*' => ['required', 'integer', 'distinct', 'exists:branches,id'],
             'default_branch_id' => ['sometimes', 'nullable', 'integer'],
             'roles' => ['missing'],
         ], self::VALIDATION_MESSAGES);
@@ -61,9 +64,13 @@ class UserController extends Controller
 
         $user = DB::transaction(function () use ($data, $request) {
             $actor = $this->lockedActor($request);
-            $role = $this->delegableRole($actor, $data['role_id']);
-            $this->validateDefaultBranch($role, $data['default_branch_id'] ?? null);
+            $this->delegableRole($actor, $data['role_id']);
+            $branchIds = array_map('intval', $data['branch_ids']);
+            $this->validateAssignedBranches($actor, $branchIds);
+            $this->validateDefaultBranch($data['default_branch_id'] ?? null, $branchIds);
+            unset($data['branch_ids']);
             $user = User::create($data);
+            $user->branches()->sync($branchIds);
 
             return $user->refresh();
         });
@@ -82,6 +89,8 @@ class UserController extends Controller
             'password' => ['sometimes', 'required', 'string', 'min:12', 'confirmed'],
             'is_active' => ['sometimes', 'boolean'],
             'role_id' => ['sometimes', 'required', 'integer', Rule::exists('roles', 'id')->where('guard_name', 'web')],
+            'branch_ids' => ['sometimes', 'array'],
+            'branch_ids.*' => ['required', 'integer', 'distinct', 'exists:branches,id'],
             'default_branch_id' => ['sometimes', 'nullable', 'integer'],
             'roles' => ['missing'],
         ], self::VALIDATION_MESSAGES);
@@ -98,6 +107,11 @@ class UserController extends Controller
                 return response()->json(['message' => 'No puedes desactivar tu propia cuenta.'], 422);
             }
 
+            $branchIds = array_key_exists('branch_ids', $data)
+                ? array_map('intval', $data['branch_ids'])
+                : $user->branches()->pluck('branches.id')->all();
+            $this->validateAssignedBranches($actor, $branchIds);
+
             if ($user->is_active && $user->isAdmin()
                 && (! $active || ($roleId !== null && (int) $roleId !== (int) $user->role_id))
                 && User::where('role_id', $user->role_id)->where('is_active', true)->count() <= 1) {
@@ -105,14 +119,17 @@ class UserController extends Controller
             }
 
             $attributes = $data;
-            unset($attributes['password_confirmation']);
+            unset($attributes['password_confirmation'], $attributes['branch_ids']);
             if (array_key_exists('default_branch_id', $data)) {
-                $this->validateDefaultBranch($role, $data['default_branch_id']);
-            } elseif ($role->id !== $user->role_id && $user->default_branch_id !== null
-                && ! Access::activeBranchesForRole($role)->whereKey($user->default_branch_id)->exists()) {
+                $this->validateDefaultBranch($data['default_branch_id'], $branchIds);
+            } elseif (array_key_exists('branch_ids', $data) && $user->default_branch_id !== null
+                && ! in_array($user->default_branch_id, $branchIds, true)) {
                 $attributes['default_branch_id'] = null;
             }
             $user->fill($attributes)->save();
+            if (array_key_exists('branch_ids', $data)) {
+                $user->branches()->sync($branchIds);
+            }
             $user->unsetRelation('role');
 
             if (! $active || array_key_exists('password', $data)) {
@@ -123,16 +140,22 @@ class UserController extends Controller
         });
     }
 
-    public function defaultBranchOptions(Request $request): JsonResponse
+    public function branchOptions(Request $request): JsonResponse
     {
         $this->ensureManage($request);
+        $branches = $request->user()->isAdmin()
+            ? Branch::query()
+            : $request->user()->branches();
 
-        return response()->json(Access::activeBranchesForRole($request->user()->role)
-            ->orderBy('name')->get(['id', 'name', 'code']));
+        return response()->json($branches->orderBy('name')
+            ->get(['branches.id', 'branches.name', 'branches.code', 'branches.is_active']));
     }
 
     private function userPayload(User $user): array
     {
+        $branches = $user->branches()->orderBy('name')
+            ->get(['branches.id', 'branches.name', 'branches.code', 'branches.is_active']);
+
         return [
             'id' => $user->id,
             'name' => $user->name,
@@ -141,6 +164,8 @@ class UserController extends Controller
             'is_active' => $user->is_active,
             'role_id' => $user->role_id,
             'default_branch_id' => $user->default_branch_id,
+            'branch_ids' => $branches->modelKeys(),
+            'branches' => $branches,
             'role' => ['id' => $user->role->id, 'name' => $user->role->name],
             'permissions' => $user->permissionNames(),
         ];
@@ -166,7 +191,8 @@ class UserController extends Controller
             return true;
         }
 
-        return Access::canDelegate($actor, $target->role);
+        return Access::canDelegate($actor, $target->role)
+            && ! array_diff($target->branches->modelKeys(), Access::assignedBranchIds($actor));
     }
 
     private function delegableRole(User $actor, int $roleId): Role
@@ -177,11 +203,21 @@ class UserController extends Controller
         return $role;
     }
 
-    private function validateDefaultBranch(Role $role, ?int $branchId): void
+    private function validateAssignedBranches(User $actor, array $branchIds): void
     {
-        if ($branchId !== null && ! Access::activeBranchesForRole($role)->whereKey($branchId)->exists()) {
+        if (! $actor->isAdmin() && array_diff($branchIds, Access::assignedBranchIds($actor))) {
             throw ValidationException::withMessages([
-                'default_branch_id' => 'Selecciona una sucursal activa autorizada para el rol del usuario.',
+                'branch_ids' => 'Solo puedes asignar sucursales a las que tienes acceso.',
+            ]);
+        }
+    }
+
+    private function validateDefaultBranch(?int $branchId, array $branchIds): void
+    {
+        if ($branchId !== null && (! in_array($branchId, $branchIds, true)
+            || ! Branch::query()->whereKey($branchId)->where('is_active', true)->exists())) {
+            throw ValidationException::withMessages([
+                'default_branch_id' => 'La sucursal por defecto debe estar activa y asignada al usuario.',
             ]);
         }
     }

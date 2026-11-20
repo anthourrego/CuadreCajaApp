@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Support\Access;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,9 +46,12 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
-        $defaultBranch = $user->default_branch_id === null ? null : Access::activeBranchesForRole($user->role)
-            ->whereKey($user->default_branch_id)
-            ->first(['id', 'name', 'code']);
+        $branches = $user->branches()->orderBy('name')
+            ->get(['branches.id', 'branches.name', 'branches.code', 'branches.is_active']);
+        $defaultBranch = $branches->firstWhere('id', $user->default_branch_id);
+        if (! $defaultBranch?->is_active) {
+            $defaultBranch = null;
+        }
 
         return [
             'id' => $user->id,
@@ -60,6 +62,8 @@ class AuthController extends Controller
             'role_id' => $user->role_id,
             'default_branch_id' => $user->default_branch_id,
             'default_branch' => $defaultBranch,
+            'branch_ids' => $branches->modelKeys(),
+            'branches' => $branches,
             'role' => ['id' => $user->role->id, 'name' => $user->role->name],
             'permissions' => $user->permissionNames(),
         ];

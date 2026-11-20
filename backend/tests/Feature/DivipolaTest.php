@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Models\Branch;
 use App\Models\User;
+use Database\Seeders\AdminUserSeeder;
+use Database\Seeders\BranchSeeder;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DivipolaSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +17,46 @@ use Tests\TestCase;
 class DivipolaTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_database_seeder_creates_the_initial_branch_and_default_admin(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $branch = Branch::where('code', '001')->firstOrFail();
+        $admin = User::where('username', 'admin')->firstOrFail();
+
+        $this->assertDatabaseCount('branches', 1);
+        $this->assertDatabaseHas('branches', ['name' => 'Sucursal principal', 'code' => '001']);
+        $this->assertDatabaseCount('branch_user', 0);
+        $this->assertSame('admin', $admin->role->name);
+        $this->assertSame('admin@cuadrecaja.test', $admin->email);
+    }
+
+    public function test_default_admin_seeder_is_idempotent_and_does_not_replace_the_password(): void
+    {
+        $this->seed([RoleSeeder::class, AdminUserSeeder::class]);
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $passwordHash = $admin->password;
+
+        $this->seed(AdminUserSeeder::class);
+
+        $this->assertDatabaseCount('users', 1);
+        $this->assertSame($passwordHash, $admin->fresh()->password);
+    }
+
+    public function test_initial_branch_seeder_preserves_existing_branch_changes_when_rerun(): void
+    {
+        $this->seed([RoleSeeder::class, BranchSeeder::class]);
+        $branch = Branch::where('code', '001')->firstOrFail();
+        $branch->update(['name' => 'Principal editada']);
+        $user = User::factory()->create();
+        $branch->users()->attach($user);
+
+        $this->seed(BranchSeeder::class);
+
+        $this->assertDatabaseCount('branches', 1);
+        $this->assertDatabaseHas('branches', ['id' => $branch->id, 'name' => 'Principal editada', 'code' => '001']);
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $user->id]);
+    }
 
     public function test_catalog_is_complete_preserves_codes_and_can_be_seeded_again(): void
     {

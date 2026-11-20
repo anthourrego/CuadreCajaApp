@@ -23,11 +23,6 @@ class Branch extends Model
         return $this->belongsToMany(User::class)->withTimestamps();
     }
 
-    public function roles(): BelongsToMany
-    {
-        return $this->belongsToMany(Role::class);
-    }
-
     public function municipality(): BelongsTo
     {
         return $this->belongsTo(Municipality::class, 'municipality_code', 'code');

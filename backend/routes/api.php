@@ -28,7 +28,7 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::apiResource('registers', CashRegisterController::class)
         ->parameters(['registers' => 'cashRegister'])
         ->only(['index', 'store', 'show', 'update']);
-    Route::get('/users/default-branch-options', [UserController::class, 'defaultBranchOptions']);
+    Route::get('/users/branch-options', [UserController::class, 'branchOptions']);
     Route::apiResource('users', UserController::class)->only(['index', 'store', 'update']);
     Route::get('/roles/options', [RoleController::class, 'options']);
     Route::apiResource('roles', RoleController::class)->only(['index', 'store', 'update', 'destroy']);

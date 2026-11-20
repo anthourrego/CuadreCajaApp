@@ -4,7 +4,6 @@ namespace App\Support;
 
 use App\Models\Branch;
 use App\Models\User;
-use Illuminate\Database\Eloquent\Builder;
 use Spatie\Permission\Models\Role;
 
 class Access
@@ -44,23 +43,25 @@ class Access
             return Branch::query()->pluck('id')->all();
         }
 
-        return Branch::query()->whereHas('roles', fn ($query) => $query
-            ->where('roles.id', $user->role_id)
-            ->whereHas('permissions', fn ($permissions) => $permissions->where('name', $permission)->where('guard_name', 'web')))
-            ->pluck('id')->all();
+        if (! self::allows($user, $permission)) {
+            return [];
+        }
+
+        return $user->branches()->pluck('branches.id')->all();
+    }
+
+    public static function assignedBranchIds(User $user): array
+    {
+        if ($user->isAdmin()) {
+            return Branch::query()->pluck('id')->all();
+        }
+
+        return $user->branches()->pluck('branches.id')->all();
     }
 
     public static function branch(User $user, string $permission, int $branchId): bool
     {
         return $user->isAdmin() || in_array($branchId, self::branchIds($user, $permission));
-    }
-
-    /** @return Builder<Branch> */
-    public static function activeBranchesForRole(Role $role): Builder
-    {
-        return Branch::query()->where('is_active', true)
-            ->when($role->name !== 'admin', fn ($query) => $query
-                ->whereHas('roles', fn ($roles) => $roles->whereKey($role->id)));
     }
 
     public static function canDelegate(User $actor, Role $role): bool
@@ -72,36 +73,23 @@ class Access
             return false;
         }
 
-        $branches = Branch::query()->whereHas('roles', fn ($query) => $query->whereKey($role->id))->pluck('id')->all();
-
-        return self::canGrant($actor, $role->permissions->pluck('name')->all(), $branches);
+        return self::canGrant($actor, $role->permissions->pluck('name')->all());
     }
 
-    public static function canGrant(User $actor, array $permissions, array $branches): bool
+    public static function canGrant(User $actor, array $permissions): bool
     {
         if ($actor->isAdmin()) {
             return true;
         }
         foreach ($permissions as $permission) {
-            if (isset(self::GLOBAL[$permission])) {
-                if (! self::allows($actor, $permission)) {
-                    return false;
-                }
-            } elseif (isset(self::BRANCH[$permission])) {
-                foreach ($branches as $branchId) {
-                    if (! self::branch($actor, $permission, $branchId)) {
-                        return false;
-                    }
-                }
-            } else {
+            if (! isset(self::GLOBAL[$permission]) && ! isset(self::BRANCH[$permission])) {
+                return false;
+            }
+            if (! self::allows($actor, $permission)) {
                 return false;
             }
         }
 
-        // Even a role without branch permissions must not be assigned outside the actor's branches.
-        $accessible = Branch::query()->whereHas('roles', fn ($query) => $query
-            ->where('roles.id', $actor->role_id))->pluck('id')->all();
-
-        return ! array_diff($branches, $accessible);
+        return true;
     }
 }

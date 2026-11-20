@@ -7,6 +7,7 @@ export type User = {
   email: string
   role_id: number
   default_branch_id: number | null
+  branch_ids: number[]
   role: { id: number; name: string }
   permissions: string[]
   is_active: boolean

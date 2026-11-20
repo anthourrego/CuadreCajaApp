@@ -19,8 +19,8 @@ class BranchController extends Controller
         'code.required' => 'El código de la sucursal es obligatorio.',
         'code.unique' => 'Ya existe una sucursal con este código.',
         'municipality_code.exists' => 'El municipio no existe o su ubicación está inactiva.',
-        'roles.missing' => 'Las sucursales se asignan desde los roles.',
-        'user_ids.missing' => 'La asignación de usuarios a sucursales ya no está disponible; usa roles.',
+        'roles.missing' => 'Las sucursales se asignan a usuarios, no a roles.',
+        'user_ids.missing' => 'Asigna usuarios desde la administración de usuarios.',
     ];
 
     public function index(Request $request): JsonResponse
@@ -48,7 +48,12 @@ class BranchController extends Controller
             'user_ids' => ['missing'],
         ], self::VALIDATION_MESSAGES);
 
-        $branch = Branch::create($data);
+        $branch = DB::transaction(function () use ($data, $request) {
+            $branch = Branch::create($data);
+            $branch->users()->attach($request->user());
+
+            return $branch;
+        });
 
         return response()->json($branch->load('municipality.department'), 201);
     }

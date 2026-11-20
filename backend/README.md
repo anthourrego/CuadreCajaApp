@@ -14,31 +14,28 @@ La API usa Laravel Sanctum para autenticación por token y Spatie Permission par
 ### Puesta en marcha
 
 1. Configura la conexión MySQL en `.env`.
-2. Ejecuta las migraciones y carga los roles:
+2. Ejecuta las migraciones y carga los datos iniciales:
 
    ```bash
    php artisan migrate
-   php artisan db:seed --class=RoleSeeder
-   php artisan db:seed --class=DivipolaSeeder
+   php artisan db:seed
    ```
 
-3. Crea el primer administrador de forma interactiva:
-
-   ```bash
-   php artisan app:create-admin
-   ```
+`php artisan db:seed` crea el administrador inicial si todavía no existe: usuario `admin`, correo `admin@cuadrecaja.test` y rol `admin`. La contraseña se genera aleatoriamente y se muestra una sola vez en la salida del comando; guárdala al ejecutar el seeder. Repetirlo conserva la cuenta y su contraseña. `php artisan app:create-admin` sigue disponible para crear administradores con datos personalizados.
 
 No hay registro público. Los usuarios autorizados pueden crear usuarios, configurar roles y asignar usuarios a cajas.
 
 Las sucursales pueden desactivarse o reactivarse con `PUT /api/branches/{branch}` y `is_active`. Sus roles, cajas y cuentas se conservan y se pueden consultar; no se pueden crear ni trasladar cajas o cuentas a una sucursal inactiva. Se pueden editar las configuraciones existentes. Al implementar operaciones financieras o cuadres, también deberán rechazar nuevas operaciones en sucursales inactivas.
 
-Cada usuario tiene exactamente un rol, guardado en `users.role_id` con clave foránea a `roles`. La API recibe `role_id` en `POST|PUT /api/users` y devuelve `role_id` y `role`; el campo anterior `roles` ya no se acepta. El acceso se configura desde los roles con `permissions` y `branch_ids` en `POST|PUT /api/roles`. La API de sucursales rechaza `roles` y no altera sus asignaciones. Los permisos de usuarios, roles, ubicaciones y creación de sucursales son globales; los demás aplican únicamente a las sucursales asignadas al rol del usuario. Ver cajas asignadas requiere además asignación individual; ver todas las cajas es un permiso independiente. El rol `admin` siempre tiene acceso global y no puede modificarse ni eliminarse.
+`DatabaseSeeder` crea inicialmente la sucursal **Sucursal principal** con código `001`. Las sucursales se asignan directamente a usuarios; el seeder no asigna la sucursal inicial ni cambia sucursales o membresías existentes al volver a ejecutarse.
 
-La gestión de roles y usuarios es delegable: un gestor solo puede asignar o modificar roles cuyos permisos y sucursales estén dentro de su propio alcance, y solo puede modificar usuarios cuyo rol esté dentro de ese alcance. Solo un administrador puede asignar el rol `admin` o modificar un usuario administrador. No se pueden eliminar roles con usuarios o sucursales asignados. Los nombres de `supervisor` y `cajero` son inmutables. Volver a ejecutar `RoleSeeder` no restaura los permisos personalizados de roles existentes.
+Cada usuario tiene exactamente un rol, guardado en `users.role_id` con clave foránea a `roles`. La API recibe `role_id` y `branch_ids` en `POST|PUT /api/users` y devuelve `role_id`, `role` y las sucursales asignadas; el campo anterior `roles` ya no se acepta. Las sucursales del usuario se guardan en la tabla pivote `branch_user`. Los roles solo definen permisos y la API rechaza `branch_ids` en `POST|PUT /api/roles`. Para usuarios que no sean administradores, acceder a una sucursal requiere tanto el permiso del rol como una asignación directa en `branch_user`. La sucursal por defecto debe estar activa y asignada al usuario. Ver cajas asignadas requiere además asignación individual; ver todas las cajas es un permiso independiente. El rol `admin` siempre tiene acceso global y no puede modificarse ni eliminarse.
+
+La gestión de roles y usuarios es delegable: un gestor solo puede asignar permisos que ya posee y sucursales a las que tiene acceso; solo puede modificar usuarios cuyos permisos y sucursales estén dentro de ese alcance. Solo un administrador puede asignar el rol `admin` o modificar un usuario administrador. No se pueden eliminar roles con usuarios asignados. Los nombres de `supervisor` y `cajero` son inmutables. Volver a ejecutar `RoleSeeder` no restaura los permisos personalizados de roles existentes.
 
 La migración a `users.role_id` elimina `model_has_roles` tras copiar las asignaciones. Antes de ejecutarla, haz una copia de seguridad y detén las escrituras. La migración se detiene si hay usuarios sin rol, permisos directos de usuario o roles de otros tipos de modelo; deben reconciliarse manualmente. Si un usuario tiene varios roles, hay que indicar el rol a conservar y todos sus roles actuales en `ROLE_MIGRATION_CHOICES` como JSON, por ejemplo `{"123":{"role":"admin","expected":["admin","cajero"]}}`. Rechaza cambios inesperados y protege el último administrador activo. Los roles descartados no se conservan; la reversión requiere restauración o reconciliación manual. Spatie sigue gestionando los permisos de los roles; la relación de usuarios con roles ya no usa los métodos de asignación de Spatie.
 
-La migración convierte las asignaciones directas de usuarios y las de cajas de cajeros en roles por sucursal. Esto amplía el acceso a todos los usuarios que tengan cada rol convertido: revisa los roles de cada sucursal después de migrar. La tabla anterior `branch_user` se conserva como referencia, pero deja de controlar el acceso y la API rechaza `user_ids` para sucursales. Los cambios posteriores a los roles de sucursal no se reflejan en esa tabla; una reversión requeriría reconciliación manual.
+El acceso a sucursales se administra exclusivamente por usuario mediante `branch_user`; las asignaciones individuales a cajas siguen en `cash_register_user` y no sustituyen la membresía de sucursal. Las sucursales creadas por la API se asignan automáticamente al usuario que las crea. En este proyecto aún no desplegado, el cambio de alcance requiere recrear la base de desarrollo con `php artisan migrate:fresh --seed`.
 
 Un administrador puede desactivar o reactivar usuarios con `PUT /api/users/{user}` y `is_active`. Desactivar revoca sus tokens y bloquea el acceso; cambiar la contraseña también revoca los tokens. Una cuenta no puede desactivarse a sí misma y debe mantenerse al menos un administrador activo.
 

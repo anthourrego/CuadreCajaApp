@@ -34,6 +34,7 @@ class UserManagementTest extends TestCase
             'password' => 'password-seguro-123',
             'password_confirmation' => 'password-seguro-123',
             'role_id' => Role::findByName('cajero', 'web')->id,
+            'branch_ids' => [],
         ])->assertCreated()->assertJsonPath('is_active', true);
 
         $id = $response->json('id');
@@ -124,65 +125,85 @@ class UserManagementTest extends TestCase
         $this->assertSame(Role::findByName('supervisor', 'web')->id, $user->fresh()->role_id);
     }
 
-    public function test_default_branch_must_be_active_and_authorized_for_the_users_role(): void
+    public function test_branch_assignments_are_per_user_and_default_branch_must_be_assigned_and_active(): void
     {
         $admin = User::factory()->create(['role_id' => Role::findByName('admin', 'web')->id]);
         $role = Role::findByName('cajero', 'web');
         $branch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $inactive = Branch::create(['name' => 'Norte', 'code' => 'NTE', 'is_active' => false]);
         $other = Branch::create(['name' => 'Sur', 'code' => 'SUR']);
-        $branch->roles()->attach($role);
-        $inactive->roles()->attach($role);
         $payload = [
             'name' => 'Cajero', 'username' => 'cajero.prueba', 'email' => 'cajero@example.test',
             'password' => 'password-seguro-123', 'password_confirmation' => 'password-seguro-123',
-            'role_id' => $role->id,
+            'role_id' => $role->id, 'branch_ids' => [$branch->id],
         ];
 
-        $this->actingAs($admin, 'sanctum')->getJson('/api/users/default-branch-options')
-            ->assertOk()->assertJsonCount(2)->assertJsonMissing(['id' => $inactive->id]);
-        foreach ([$inactive->id, $other->id, 99999] as $branchId) {
-            $this->postJson('/api/users', $payload + ['default_branch_id' => $branchId])
-                ->assertUnprocessable()->assertJsonValidationErrors('default_branch_id');
-        }
+        $this->actingAs($admin, 'sanctum')->getJson('/api/users/branch-options')
+            ->assertOk()->assertJsonCount(3)->assertJsonFragment(['id' => $inactive->id, 'is_active' => false]);
+        $this->postJson('/api/users', $payload + ['default_branch_id' => $other->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('default_branch_id');
+        $this->postJson('/api/users', $payload + ['default_branch_id' => $inactive->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('default_branch_id');
+        $this->postJson('/api/users', array_replace($payload, ['branch_ids' => [$other->id], 'default_branch_id' => $branch->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('default_branch_id');
         $id = $this->postJson('/api/users', $payload + ['default_branch_id' => $branch->id])
-            ->assertCreated()->assertJsonPath('default_branch_id', $branch->id)->json('id');
+            ->assertCreated()->assertJsonPath('default_branch_id', $branch->id)
+            ->assertJsonPath('branch_ids.0', $branch->id)->json('id');
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $id]);
         $this->putJson("/api/users/{$id}", ['name' => 'Cajero editado'])
             ->assertOk()->assertJsonPath('default_branch_id', $branch->id);
-        $supervisor = Role::findByName('supervisor', 'web');
-        $this->putJson("/api/users/{$id}", ['role_id' => $supervisor->id, 'default_branch_id' => $branch->id])
-            ->assertUnprocessable()->assertJsonValidationErrors('default_branch_id');
+        $this->putJson("/api/users/{$id}", ['branch_ids' => []])
+            ->assertOk()->assertJsonPath('default_branch_id', null)->assertJsonCount(0, 'branch_ids');
         $this->putJson("/api/users/{$id}", ['default_branch_id' => null])
-            ->assertOk()->assertJsonPath('default_branch_id', null);
-        $this->putJson("/api/users/{$id}", ['default_branch_id' => (string) $branch->id])
-            ->assertOk()->assertJsonPath('default_branch_id', $branch->id);
-        $this->putJson("/api/users/{$id}", ['role_id' => $supervisor->id])
             ->assertOk()->assertJsonPath('default_branch_id', null);
     }
 
-    public function test_default_branch_is_a_preference_and_is_ignored_when_unavailable(): void
+    public function test_user_branch_membership_limits_registers_and_profile_default_branch(): void
     {
         $role = Role::findByName('cajero', 'web');
         $branch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $other = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
-        $branch->roles()->attach($role);
-        $other->roles()->attach($role);
         $user = User::factory()->create(['role_id' => $role->id, 'default_branch_id' => $branch->id]);
+        $user->branches()->attach([$branch->id, $other->id]);
         $visible = CashRegister::create(['branch_id' => $other->id, 'name' => 'Asignada', 'code' => 'A1']);
         $visible->users()->attach($user);
         CashRegister::create(['branch_id' => $branch->id, 'name' => 'No asignada', 'code' => 'A1']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/user')
-            ->assertOk()->assertJsonPath('default_branch.id', $branch->id);
+            ->assertOk()->assertJsonPath('default_branch.id', $branch->id)->assertJsonCount(2, 'branches');
         $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $visible->id);
         $this->getJson('/api/registers?branch_id='.$branch->id)->assertOk()->assertJsonCount(0);
-        $this->getJson('/api/users/default-branch-options')->assertForbidden();
+        $this->getJson('/api/users/branch-options')->assertForbidden();
 
         $branch->update(['is_active' => false]);
         $this->getJson('/api/user')->assertOk()->assertJsonPath('default_branch', null);
         $branch->update(['is_active' => true]);
-        $branch->roles()->detach($role);
+        $user->branches()->detach($branch);
+        $user->cashRegisters()->detach($visible);
         $this->getJson('/api/user')->assertOk()->assertJsonPath('default_branch', null);
-        $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $visible->id);
+        $this->getJson('/api/registers')->assertOk()->assertJsonCount(0);
+    }
+
+    public function test_manager_can_only_assign_users_to_the_managers_own_branches(): void
+    {
+        $managerRole = Role::create(['name' => 'gestor', 'guard_name' => 'web']);
+        $managerRole->givePermissionTo(['users.manage', 'branches.view', 'registers.view_all']);
+        $manager = User::factory()->create(['role_id' => $managerRole->id]);
+        $allowed = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
+        $outside = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
+        $manager->branches()->attach($allowed);
+        $targetRole = Role::create(['name' => 'operador', 'guard_name' => 'web']);
+        $targetRole->givePermissionTo('branches.view');
+        $target = User::factory()->create(['role_id' => $targetRole->id]);
+        $target->branches()->attach($outside);
+
+        $this->actingAs($manager, 'sanctum')->getJson('/api/users')
+            ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $manager->id);
+        $this->postJson('/api/users', [
+            'name' => 'Nuevo', 'username' => 'nuevo', 'email' => 'nuevo@example.test',
+            'password' => 'password-seguro-123', 'password_confirmation' => 'password-seguro-123',
+            'role_id' => $targetRole->id, 'branch_ids' => [$outside->id],
+        ])->assertUnprocessable()->assertJsonValidationErrors('branch_ids');
+        $this->putJson("/api/users/{$target->id}", ['branch_ids' => [$allowed->id]])->assertForbidden();
     }
 }

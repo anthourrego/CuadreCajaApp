@@ -4,12 +4,13 @@ import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
 import type { BranchSummary, User } from './api'
 import './UserManagement.css'
+import './BranchManagement.css'
 
 type Props = {
   token: string
   currentUser: User
   users: User[]
-  availableRoles: { id: number; name: string; branch_ids: number[] }[]
+  availableRoles: { id: number; name: string }[]
   onSaved: () => void
   onUserUpdated: (user: User) => void
   onSessionExpired: () => void
@@ -17,7 +18,7 @@ type Props = {
 
 type BranchOptions =
   | { status: 'loading' }
-  | { status: 'ready'; data: BranchSummary[] }
+  | { status: 'ready'; data: (BranchSummary & { is_active: boolean })[] }
   | { status: 'error'; message: string }
 
 function UserManagement({ token, currentUser, users, availableRoles, onSaved, onUserUpdated, onSessionExpired }: Props) {
@@ -28,6 +29,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
   const [password, setPassword] = useState('')
   const [confirmation, setConfirmation] = useState('')
   const [roleId, setRoleId] = useState('')
+  const [selectedBranchIds, setSelectedBranchIds] = useState<number[]>([])
   const [defaultBranchId, setDefaultBranchId] = useState('')
   const [branchOptions, setBranchOptions] = useState<BranchOptions>({ status: 'loading' })
   const [branchRetry, setBranchRetry] = useState(0)
@@ -39,7 +41,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
   useEffect(() => {
     if (!formOpen) return
     let active = true
-    request<BranchSummary[]>('/users/default-branch-options', { headers: { Authorization: `Bearer ${token}` } })
+    request<(BranchSummary & { is_active: boolean })[]>('/users/branch-options', { headers: { Authorization: `Bearer ${token}` } })
       .then((data) => {
         if (!Array.isArray(data)) throw new Error('El servidor devolvió una respuesta inválida.')
         if (active) setBranchOptions({ status: 'ready', data })
@@ -52,13 +54,9 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
     return () => { active = false }
   }, [formOpen, token, branchRetry, onSessionExpired])
 
-  function branchesForRole(id: string) {
-    const role = availableRoles.find((item) => String(item.id) === id)
-    if (!role || branchOptions.status !== 'ready') return []
-    return branchOptions.data.filter((branch) => role.name === 'admin' || role.branch_ids.includes(branch.id))
-  }
-
-  const eligibleBranches = branchesForRole(roleId)
+  const eligibleBranches = branchOptions.status === 'ready'
+    ? branchOptions.data.filter((branch) => branch.is_active && selectedBranchIds.includes(branch.id))
+    : []
   const selectedBranchId = eligibleBranches.some((branch) => String(branch.id) === defaultBranchId) ? defaultBranchId : ''
 
   function openForm(user: User | 'new') {
@@ -67,6 +65,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
     setUsername(user === 'new' ? '' : user.username)
     setEmail(user === 'new' ? '' : user.email)
     setRoleId(user === 'new' ? '' : String(user.role_id))
+    setSelectedBranchIds(user === 'new' ? [] : user.branch_ids)
     setDefaultBranchId(user === 'new' || user.default_branch_id === null ? '' : String(user.default_branch_id))
     setBranchOptions({ status: 'loading' })
     setPassword('')
@@ -91,6 +90,10 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
       setError('Selecciona un rol.')
       return
     }
+    if (branchOptions.status !== 'ready') {
+      setError('Carga las sucursales disponibles antes de guardar.')
+      return
+    }
     if ((editing === 'new' || password || confirmation) && (password.length < 12 || password !== confirmation)) {
       setError('La contraseña debe tener al menos 12 caracteres y coincidir con la confirmación.')
       return
@@ -99,7 +102,8 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
     try {
       const data = {
         name: name.trim(), username: username.trim(), email: email.trim(), role_id: Number(roleId),
-        ...(branchOptions.status === 'ready' ? { default_branch_id: selectedBranchId ? Number(selectedBranchId) : null } : {}),
+        branch_ids: selectedBranchIds,
+        default_branch_id: selectedBranchId ? Number(selectedBranchId) : null,
         ...(password ? { password, password_confirmation: confirmation } : {}),
       }
       const result = await request<User>(editing === 'new' ? '/users' : `/users/${editing.id}`, {
@@ -170,20 +174,17 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
             <div className="user-field"><label htmlFor="user-email">Correo electrónico</label><input id="user-email" type="email" required maxLength={255} value={email} onChange={(event) => setEmail(event.target.value)} /></div>
             <div className="user-field"><label htmlFor="user-password">{editing === 'new' ? 'Contraseña' : 'Nueva contraseña (opcional)'}</label><input id="user-password" type="password" autoComplete="new-password" required={editing === 'new'} minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} /><small>Mínimo 12 caracteres. Al cambiarla se cierran las sesiones existentes.</small></div>
             <div className="user-field"><label htmlFor="user-confirm">Confirmar contraseña</label><input id="user-confirm" type="password" autoComplete="new-password" required={editing === 'new' || Boolean(password)} minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></div>
-            <div className="user-field"><label htmlFor="user-role">Rol</label><select id="user-role" required value={roleId} onChange={(event) => {
-              const nextRoleId = event.target.value
-              setRoleId(nextRoleId)
-              if (!branchesForRole(nextRoleId).some((branch) => String(branch.id) === defaultBranchId)) setDefaultBranchId('')
-            }}><option value="" disabled>Selecciona un rol</option>{availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></div>
+            <div className="user-field"><label htmlFor="user-role">Rol</label><select id="user-role" required value={roleId} onChange={(event) => setRoleId(event.target.value)}><option value="" disabled>Selecciona un rol</option>{availableRoles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></div>
+            <fieldset className="branch-users user-branch-assignment"><legend>Sucursales asignadas</legend><p>El usuario solo podrá acceder a sucursales asignadas aquí y autorizadas por sus permisos.</p><div className="branch-user-list">{branchOptions.status === 'ready' ? branchOptions.data.map((branch) => <label key={branch.id}><input type="checkbox" checked={selectedBranchIds.includes(branch.id)} onChange={(event) => setSelectedBranchIds(event.target.checked ? [...selectedBranchIds, branch.id] : selectedBranchIds.filter((id) => id !== branch.id))} /><span>{branch.name} · {branch.code}{!branch.is_active && ' (inactiva)'}</span></label>) : null}</div>{branchOptions.status === 'ready' && branchOptions.data.length === 0 && <p>No tienes sucursales disponibles para asignar.</p>}</fieldset>
             <div className="user-field">
               <label htmlFor="user-default-branch">Sucursal por defecto (opcional)</label>
-              <select id="user-default-branch" value={selectedBranchId} disabled={!roleId || branchOptions.status !== 'ready'} onChange={(event) => setDefaultBranchId(event.target.value)}>
+              <select id="user-default-branch" value={selectedBranchId} disabled={branchOptions.status !== 'ready'} onChange={(event) => setDefaultBranchId(event.target.value)}>
                 <option value="">Sin sucursal por defecto</option>
                 {eligibleBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}
               </select>
               {branchOptions.status === 'loading' && <small role="status">Cargando sucursales...</small>}
               {branchOptions.status === 'error' && <small role="alert">{branchOptions.message} <button type="button" onClick={() => { setBranchOptions({ status: 'loading' }); setBranchRetry((value) => value + 1) }}>Reintentar</button></small>}
-              {branchOptions.status === 'ready' && roleId && <small>{eligibleBranches.length ? 'Se selecciona al entrar a Cajas. No cambia los permisos del usuario.' : 'El rol no tiene sucursales activas disponibles.'}</small>}
+              {branchOptions.status === 'ready' && <small>{eligibleBranches.length ? 'Se selecciona al entrar a Cajas. No cambia los permisos del usuario.' : 'Asigna una sucursal activa para poder elegir una predeterminada.'}</small>}
             </div>
           </div>
           <div className="user-form-actions"><button type="submit" className="user-primary" disabled={busy}>{busy ? 'Guardando...' : 'Guardar usuario'}</button><button type="button" className="user-secondary" disabled={busy} onClick={() => { setEditing(null); setError(''); setPassword(''); setConfirmation('') }}>Cancelar</button></div>

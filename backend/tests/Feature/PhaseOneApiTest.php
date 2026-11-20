@@ -7,10 +7,7 @@ use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -71,7 +68,7 @@ class PhaseOneApiTest extends TestCase
         $user->update(['role_id' => Role::findByName('supervisor', 'web')->id]);
         $assignedBranch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $otherBranch = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
-        $assignedBranch->roles()->attach(Role::findByName('supervisor')->id);
+        $assignedBranch->users()->attach($user);
 
         $assignedAccount = Account::create([
             'branch_id' => $assignedBranch->id,
@@ -146,7 +143,7 @@ class PhaseOneApiTest extends TestCase
             'code' => 'CAJA-2',
         ]);
         $assignedRegister->users()->attach($cashier);
-        $branch->roles()->attach(Role::findByName('cajero')->id);
+        $branch->users()->attach($cashier);
         $account = Account::create([
             'branch_id' => $branch->id,
             'name' => 'Caja menor',
@@ -178,8 +175,7 @@ class PhaseOneApiTest extends TestCase
         $allowed = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $inactive = Branch::create(['name' => 'Inactiva', 'code' => 'INA', 'is_active' => false]);
         $other = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
-        $allowed->roles()->attach($role);
-        $inactive->roles()->attach($role);
+        $user->branches()->attach([$allowed->id, $inactive->id]);
         $register = CashRegister::create(['branch_id' => $allowed->id, 'name' => 'Caja', 'code' => 'C1']);
         CashRegister::create(['branch_id' => $other->id, 'name' => 'Otra caja', 'code' => 'C1']);
 
@@ -225,7 +221,7 @@ class PhaseOneApiTest extends TestCase
         $this->assertDatabaseHas('cash_register_user', ['cash_register_id' => $id, 'user_id' => $cashier->id]);
     }
 
-    public function test_branch_updates_preserve_role_assignments(): void
+    public function test_branch_updates_preserve_user_assignments(): void
     {
         $admin = User::factory()->create();
         $admin->update(['role_id' => Role::findByName('admin', 'web')->id]);
@@ -238,30 +234,31 @@ class PhaseOneApiTest extends TestCase
             'name' => 'Centro', 'code' => 'CTR', 'address' => 'Calle 1',
         ])->assertCreated()->assertJsonPath('is_active', true);
         $id = $response->json('id');
-        Branch::findOrFail($id)->roles()->attach(Role::findByName('cajero', 'web')->id);
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $id, 'user_id' => $admin->id]);
+        Branch::findOrFail($id)->users()->attach($supervisor);
 
         $this->postJson('/api/branches', ['name' => 'Duplicada', 'code' => 'CTR'])->assertUnprocessable()->assertJsonValidationErrors('code');
         $this->putJson("/api/branches/{$id}", ['name' => 'Centro nuevo'])
             ->assertOk()->assertJsonPath('name', 'Centro nuevo');
-        $this->assertDatabaseHas('branch_role', ['branch_id' => $id, 'role_id' => Role::findByName('cajero', 'web')->id]);
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $id, 'user_id' => $supervisor->id]);
         $this->putJson("/api/branches/{$id}", ['roles' => ['admin']])->assertUnprocessable();
         $this->putJson("/api/branches/{$id}", ['user_ids' => [$supervisor->id]])->assertUnprocessable();
         $this->putJson("/api/branches/{$id}", ['user_ids' => []])->assertUnprocessable();
         $this->putJson("/api/branches/{$id}", ['is_active' => false])->assertOk()->assertJsonPath('is_active', false);
-        $this->assertDatabaseHas('branch_role', ['branch_id' => $id, 'role_id' => Role::findByName('cajero', 'web')->id]);
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $id, 'user_id' => $supervisor->id]);
         $this->putJson("/api/branches/{$id}", ['is_active' => true])->assertOk()->assertJsonPath('is_active', true);
 
         $this->actingAs($supervisor, 'sanctum')->putJson("/api/branches/{$id}", ['name' => 'No autorizado'])->assertForbidden();
     }
 
-    public function test_branch_permissions_follow_allowed_role_and_register_assignment_does_not_bypass_them(): void
+    public function test_user_branch_assignments_limit_role_permissions_and_register_assignment(): void
     {
         $user = User::factory()->create();
         $user->update(['role_id' => Role::findByName('cajero', 'web')->id]);
         $peer = User::factory()->create();
         $peer->update(['role_id' => Role::findByName('cajero', 'web')->id]);
         $branch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
-        $branch->roles()->attach(Role::findByName('cajero')->id);
+        $branch->users()->attach([$user->id, $peer->id]);
         $register = CashRegister::create(['branch_id' => $branch->id, 'name' => 'Caja', 'code' => 'C1']);
         $other = CashRegister::create(['branch_id' => $branch->id, 'name' => 'Otra', 'code' => 'C2']);
         $register->users()->attach($user);
@@ -274,48 +271,16 @@ class PhaseOneApiTest extends TestCase
         $this->getJson("/api/branches/{$branch->id}")->assertJsonMissingPath('accounts')->assertJsonCount(1, 'cash_registers');
         $this->actingAs($peer, 'sanctum')->getJson('/api/branches')->assertJsonCount(1);
 
-        $branch->roles()->detach();
+        $branch->users()->detach($user);
         $this->actingAs($user, 'sanctum')->getJson('/api/branches')->assertJsonCount(0);
         $this->getJson('/api/registers')->assertJsonCount(0);
         $this->getJson("/api/registers/{$register->id}")->assertForbidden();
         $this->getJson("/api/branches/{$branch->id}")->assertForbidden();
-        $branch->roles()->attach(Role::findByName('supervisor', 'web')->id);
+        $branch->users()->attach($user);
         $user->update(['role_id' => Role::findByName('supervisor', 'web')->id]);
         $this->actingAs($user->fresh(), 'sanctum');
         $this->getJson('/api/registers')->assertJsonCount(2);
         $this->getJson("/api/accounts/{$account->id}")->assertOk();
-    }
-
-    public function test_migration_converts_direct_and_register_assignments_to_roles_without_deleting_old_assignments(): void
-    {
-        $migration = require database_path('migrations/2026_11_16_140000_add_branch_role_access.php');
-        $migration->down();
-        Schema::create('model_has_roles', function (Blueprint $table) {
-            $table->unsignedBigInteger('role_id');
-            $table->string('model_type');
-            $table->unsignedBigInteger('model_id');
-        });
-        $supervisor = User::factory()->create();
-        $supervisor->update(['role_id' => Role::findByName('supervisor', 'web')->id]);
-        $cashier = User::factory()->create();
-        $cashier->update(['role_id' => Role::findByName('cajero', 'web')->id]);
-        DB::table('model_has_roles')->insert([
-            ['role_id' => $supervisor->role_id, 'model_id' => $supervisor->id, 'model_type' => $supervisor->getMorphClass()],
-            ['role_id' => $cashier->role_id, 'model_id' => $cashier->id, 'model_type' => $cashier->getMorphClass()],
-        ]);
-        $branch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
-        $branch->users()->attach($supervisor);
-        $branch->users()->attach($cashier);
-        $register = CashRegister::create(['branch_id' => $branch->id, 'name' => 'Caja', 'code' => 'C1']);
-        $register->users()->attach($cashier);
-        $migration->up();
-
-        $this->assertDatabaseHas('branch_role', ['branch_id' => $branch->id, 'role_id' => Role::findByName('supervisor')->id]);
-        $this->assertDatabaseHas('branch_role', ['branch_id' => $branch->id, 'role_id' => Role::findByName('cajero')->id]);
-        $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $supervisor->id]);
-        $this->assertDatabaseHas('cash_register_user', ['cash_register_id' => $register->id, 'user_id' => $cashier->id]);
-        $this->assertSame(2, DB::table('branch_role')->count());
-        Schema::drop('model_has_roles');
     }
 
     public function test_inactive_branch_rejects_new_accounts_and_registers_but_retains_existing_configuration(): void
@@ -354,6 +319,7 @@ class PhaseOneApiTest extends TestCase
                 'password' => 'a-strong-password',
                 'password_confirmation' => 'a-strong-password',
                 'role_id' => Role::findByName('cajero', 'web')->id,
+                'branch_ids' => [],
             ])
             ->assertCreated()
             ->assertJsonPath('role.name', 'cajero');
@@ -374,6 +340,7 @@ class PhaseOneApiTest extends TestCase
             'password' => 'a-strong-password',
             'password_confirmation' => 'a-strong-password',
             'role_id' => Role::findByName('cajero', 'web')->id,
+            'branch_ids' => [],
         ];
 
         $this->actingAs($admin, 'sanctum')
