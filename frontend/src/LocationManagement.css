@@ -1,0 +1,10 @@
+.location-tabs { display: flex; gap: 8px; padding: 18px 24px 0; }
+.location-tabs button { border: 1px solid #dfe5ef; border-radius: 8px; padding: 9px 14px; background: #fff; color: #53647f; font-weight: 700; }
+.location-tabs button.selected { background: #14284f; border-color: #14284f; color: #fff; }
+.location-filter { padding: 20px 24px 0; max-width: 470px; }
+.location-management select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; color: #172441; background: #fff; }
+.location-toolbar .user-field { width: min(100%, 350px); }
+@media (max-width: 760px) {
+  .location-tabs { padding: 18px 16px 0; }
+  .location-filter { padding: 20px 16px 0; }
+}

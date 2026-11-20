@@ -1,0 +1,11 @@
+.branch-toolbar .user-field { width: min(100%, 350px); }
+.branch-management select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; color: #172441; background: #fff; }
+.branch-users { border: 1px solid #e8edf5; border-radius: 8px; padding: 14px; }
+.branch-users legend { color: #2a3956; font-size: 13px; font-weight: 700; padding: 0 5px; }
+.branch-users p { margin: 0 0 12px; color: #75859a; font-size: 12px; line-height: 1.5; }
+.branch-user-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; max-height: 250px; overflow-y: auto; }
+.branch-user-list label { display: flex; align-items: flex-start; gap: 9px; margin: 0; padding: 10px; border: 1px solid #e8edf5; border-radius: 8px; }
+.branch-user-list input { margin-top: 3px; }
+.branch-user-list span { min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
+.branch-user-list strong { font-size: 12px; }
+.branch-user-list small { color: #75859a; font-size: 11px; }

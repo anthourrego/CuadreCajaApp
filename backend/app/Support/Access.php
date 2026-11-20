@@ -1,0 +1,107 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\Branch;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Spatie\Permission\Models\Role;
+
+class Access
+{
+    public const GLOBAL = [
+        'users.manage' => 'Administrar usuarios',
+        'roles.manage' => 'Administrar roles',
+        'locations.manage' => 'Administrar ubicaciones',
+        'branches.create' => 'Crear sucursales',
+    ];
+
+    public const BRANCH = [
+        'branches.view' => 'Consultar sucursales',
+        'branches.update' => 'Editar sucursales',
+        'accounts.view' => 'Consultar cuentas',
+        'accounts.create' => 'Crear cuentas',
+        'accounts.update' => 'Editar cuentas',
+        'registers.view_all' => 'Consultar todas las cajas',
+        'registers.view_assigned' => 'Consultar cajas asignadas',
+        'registers.create' => 'Crear cajas',
+        'registers.update' => 'Editar cajas',
+    ];
+
+    public const DEFAULTS = [
+        'supervisor' => ['branches.view', 'accounts.view', 'registers.view_all'],
+        'cajero' => ['branches.view', 'registers.view_assigned'],
+    ];
+
+    public static function allows(User $user, string $permission): bool
+    {
+        return $user->isAdmin() || $user->role->hasPermissionTo($permission, 'web');
+    }
+
+    public static function branchIds(User $user, string $permission): array
+    {
+        if ($user->isAdmin()) {
+            return Branch::query()->pluck('id')->all();
+        }
+
+        return Branch::query()->whereHas('roles', fn ($query) => $query
+            ->where('roles.id', $user->role_id)
+            ->whereHas('permissions', fn ($permissions) => $permissions->where('name', $permission)->where('guard_name', 'web')))
+            ->pluck('id')->all();
+    }
+
+    public static function branch(User $user, string $permission, int $branchId): bool
+    {
+        return $user->isAdmin() || in_array($branchId, self::branchIds($user, $permission));
+    }
+
+    /** @return Builder<Branch> */
+    public static function activeBranchesForRole(Role $role): Builder
+    {
+        return Branch::query()->where('is_active', true)
+            ->when($role->name !== 'admin', fn ($query) => $query
+                ->whereHas('roles', fn ($roles) => $roles->whereKey($role->id)));
+    }
+
+    public static function canDelegate(User $actor, Role $role): bool
+    {
+        if ($actor->isAdmin()) {
+            return true;
+        }
+        if ($role->name === 'admin') {
+            return false;
+        }
+
+        $branches = Branch::query()->whereHas('roles', fn ($query) => $query->whereKey($role->id))->pluck('id')->all();
+
+        return self::canGrant($actor, $role->permissions->pluck('name')->all(), $branches);
+    }
+
+    public static function canGrant(User $actor, array $permissions, array $branches): bool
+    {
+        if ($actor->isAdmin()) {
+            return true;
+        }
+        foreach ($permissions as $permission) {
+            if (isset(self::GLOBAL[$permission])) {
+                if (! self::allows($actor, $permission)) {
+                    return false;
+                }
+            } elseif (isset(self::BRANCH[$permission])) {
+                foreach ($branches as $branchId) {
+                    if (! self::branch($actor, $permission, $branchId)) {
+                        return false;
+                    }
+                }
+            } else {
+                return false;
+            }
+        }
+
+        // Even a role without branch permissions must not be assigned outside the actor's branches.
+        $accessible = Branch::query()->whereHas('roles', fn ($query) => $query
+            ->where('roles.id', $actor->role_id))->pluck('id')->all();
+
+        return ! array_diff($branches, $accessible);
+    }
+}

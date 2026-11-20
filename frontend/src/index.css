@@ -1,0 +1,19 @@
+:root {
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #14213d;
+  background: #fffdf3;
+  --brand-yellow: #ffe000;
+  --brand-gold: #f2b900;
+  --brand-blue: #1158b8;
+  --brand-navy: #14284f;
+  --brand-pink: #e81783;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; }
+button, input { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid #e8ab26; outline-offset: 3px; }

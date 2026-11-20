@@ -1,0 +1,116 @@
+<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+
+<p align="center">
+<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
+<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+</p>
+
+## Cuadre de Caja API
+
+La API usa Laravel Sanctum para autenticación por token y Spatie Permission para roles y permisos configurables. Los roles iniciales son `admin`, `supervisor` y `cajero`.
+
+### Puesta en marcha
+
+1. Configura la conexión MySQL en `.env`.
+2. Ejecuta las migraciones y carga los roles:
+
+   ```bash
+   php artisan migrate
+   php artisan db:seed --class=RoleSeeder
+   php artisan db:seed --class=DivipolaSeeder
+   ```
+
+3. Crea el primer administrador de forma interactiva:
+
+   ```bash
+   php artisan app:create-admin
+   ```
+
+No hay registro público. Los usuarios autorizados pueden crear usuarios, configurar roles y asignar usuarios a cajas.
+
+Las sucursales pueden desactivarse o reactivarse con `PUT /api/branches/{branch}` y `is_active`. Sus roles, cajas y cuentas se conservan y se pueden consultar; no se pueden crear ni trasladar cajas o cuentas a una sucursal inactiva. Se pueden editar las configuraciones existentes. Al implementar operaciones financieras o cuadres, también deberán rechazar nuevas operaciones en sucursales inactivas.
+
+Cada usuario tiene exactamente un rol, guardado en `users.role_id` con clave foránea a `roles`. La API recibe `role_id` en `POST|PUT /api/users` y devuelve `role_id` y `role`; el campo anterior `roles` ya no se acepta. El acceso se configura desde los roles con `permissions` y `branch_ids` en `POST|PUT /api/roles`. La API de sucursales rechaza `roles` y no altera sus asignaciones. Los permisos de usuarios, roles, ubicaciones y creación de sucursales son globales; los demás aplican únicamente a las sucursales asignadas al rol del usuario. Ver cajas asignadas requiere además asignación individual; ver todas las cajas es un permiso independiente. El rol `admin` siempre tiene acceso global y no puede modificarse ni eliminarse.
+
+La gestión de roles y usuarios es delegable: un gestor solo puede asignar o modificar roles cuyos permisos y sucursales estén dentro de su propio alcance, y solo puede modificar usuarios cuyo rol esté dentro de ese alcance. Solo un administrador puede asignar el rol `admin` o modificar un usuario administrador. No se pueden eliminar roles con usuarios o sucursales asignados. Los nombres de `supervisor` y `cajero` son inmutables. Volver a ejecutar `RoleSeeder` no restaura los permisos personalizados de roles existentes.
+
+La migración a `users.role_id` elimina `model_has_roles` tras copiar las asignaciones. Antes de ejecutarla, haz una copia de seguridad y detén las escrituras. La migración se detiene si hay usuarios sin rol, permisos directos de usuario o roles de otros tipos de modelo; deben reconciliarse manualmente. Si un usuario tiene varios roles, hay que indicar el rol a conservar y todos sus roles actuales en `ROLE_MIGRATION_CHOICES` como JSON, por ejemplo `{"123":{"role":"admin","expected":["admin","cajero"]}}`. Rechaza cambios inesperados y protege el último administrador activo. Los roles descartados no se conservan; la reversión requiere restauración o reconciliación manual. Spatie sigue gestionando los permisos de los roles; la relación de usuarios con roles ya no usa los métodos de asignación de Spatie.
+
+La migración convierte las asignaciones directas de usuarios y las de cajas de cajeros en roles por sucursal. Esto amplía el acceso a todos los usuarios que tengan cada rol convertido: revisa los roles de cada sucursal después de migrar. La tabla anterior `branch_user` se conserva como referencia, pero deja de controlar el acceso y la API rechaza `user_ids` para sucursales. Los cambios posteriores a los roles de sucursal no se reflejan en esa tabla; una reversión requeriría reconciliación manual.
+
+Un administrador puede desactivar o reactivar usuarios con `PUT /api/users/{user}` y `is_active`. Desactivar revoca sus tokens y bloquea el acceso; cambiar la contraseña también revoca los tokens. Una cuenta no puede desactivarse a sí misma y debe mantenerse al menos un administrador activo.
+
+El inicio de sesión usa `username` y `password`; el correo se conserva como dato de contacto. El usuario es único, tiene entre 3 y 64 caracteres y admite letras ASCII, números, puntos, guiones y guiones bajos. Se guarda en minúsculas y no distingue mayúsculas al iniciar sesión. La migración asigna `usuario_<id>` a las cuentas existentes, que un administrador puede actualizar en `PUT /api/users/{user}`.
+
+### Ubicación de sucursales
+
+El catálogo DIVIPOLA está guardado localmente y se carga con `DivipolaSeeder`, que puede ejecutarse varias veces sin borrar registros. Incluye municipios, la isla y áreas no municipalizadas del archivo fuente. Los códigos se guardan como texto para conservar ceros iniciales. La ubicación de una sucursal es opcional: se envía `municipality_code` (cinco dígitos) al crearla o actualizarla. El departamento se obtiene del municipio, evitando combinaciones contradictorias.
+
+El catálogo parte del corte DANE indicado abajo, pero puede ser editado por administradores y no se actualiza automáticamente. Al repetir el seeder se conservan nombres, tipos y estados editados. Los códigos existentes y el departamento de un municipio son inmutables. Los administradores pueden crear, editar, desactivar y reactivar ubicaciones; desactivar un departamento no cambia el estado individual de sus municipios. Las sucursales conservan su ubicación histórica, pero no se pueden hacer nuevas asignaciones a municipios o departamentos inactivos. La lectura normal solo incluye ubicaciones activas; los administradores pueden consultar todas con `?include_inactive=1`.
+
+Fuente: Departamento Administrativo Nacional de Estadística (DANE), [DIVIPOLA - Códigos municipios](https://www.datos.gov.co/d/gdxc-w37w), corte 30 de diciembre de 2024, descargado el 15 de noviembre de 2026. Datos publicados bajo [Creative Commons Atribución-CompartirIgual 4.0 Internacional](https://creativecommons.org/licenses/by-sa/4.0/). El archivo incluido es una copia del catálogo fuente; su corte no se actualiza automáticamente y debe revisarse antes de sustituirlo.
+
+### API inicial
+
+- `POST /api/login`, `POST /api/logout`, `GET /api/user`
+- `GET /api/departments`, `GET /api/departments/{code}/municipalities`
+- `POST /api/departments`, `PUT /api/departments/{code}`, `POST /api/municipalities`, `PUT /api/municipalities/{code}` (`locations.manage`)
+- `GET|POST /api/branches`, `GET|PUT|PATCH /api/branches/{branch}`
+- `GET|POST /api/accounts`, `GET|PUT|PATCH /api/accounts/{account}`
+- `GET|POST /api/registers`, `GET|PUT|PATCH /api/registers/{cashRegister}`
+- `GET|POST /api/users`, `PUT|PATCH /api/users/{user}` (`users.manage`)
+- `GET /api/roles`, `GET /api/roles/options`, `POST /api/roles`, `PUT|PATCH|DELETE /api/roles/{role}` (`roles.manage`; el listado también está disponible con `users.manage`)
+
+Las operaciones requieren el token `Bearer` recibido al iniciar sesión. La API valida cada permiso y su alcance; ocultar opciones en la interfaz no sustituye esa validación.
+
+## About Laravel
+
+Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+
+- [Simple, fast routing engine](https://laravel.com/docs/routing).
+- [Powerful dependency injection container](https://laravel.com/docs/container).
+- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
+- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
+- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
+- [Robust background job processing](https://laravel.com/docs/queues).
+- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+
+Laravel is accessible, powerful, and provides tools required for large, robust applications.
+
+## Learning Laravel
+
+Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+
+In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+
+You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+
+## Agentic Development
+
+Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+
+```bash
+composer require laravel/boost --dev
+
+php artisan boost:install
+```
+
+Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+
+## Contributing
+
+Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+
+## Code of Conduct
+
+In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+
+## Security Vulnerabilities
+
+If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+
+## License
+
+The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
