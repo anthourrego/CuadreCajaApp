@@ -13,9 +13,13 @@ La sesión utiliza un token de Sanctum en `sessionStorage`: persiste al recargar
 
 Tras iniciar sesión se muestran las secciones disponibles según los permisos del usuario. En Configuración > Usuarios se pueden crear, editar, desactivar y reactivar cuentas y asignar un único rol delegable a cada usuario. Desactivar un usuario revoca sus sesiones; cambiar su contraseña también. El registro de ventas, gastos y cuadres aún no está implementado.
 
+La sección Cuentas está oculta temporalmente en el frontend mediante `accountsSectionEnabled` en `Workspace.tsx`; la API y sus permisos no cambian.
+
+En el menú del usuario de la cabecera se puede editar el perfil, cambiar la contraseña o cerrar sesión. El nombre de usuario se define al crear la cuenta y no puede modificarse. Los formularios de perfil y contraseña se abren en ventanas modales que se pueden cancelar o cerrar con Escape. El cambio de contraseña exige la contraseña actual y cierra todas las sesiones.
+
 En pantallas pequeñas, la navegación se abre como un panel lateral desde el botón de menú y se cierra al seleccionar una opción, al tocar fuera o con Escape.
 
-En Configuración > Roles se gestionan los permisos. En Configuración > Usuarios se asignan las sucursales a cada usuario; el acceso requiere que el rol tenga el permiso correspondiente y que la sucursal esté asignada al usuario. La administración puede delegarse únicamente dentro del alcance propio; el rol administrador está protegido y mantiene acceso global. Los permisos de cajas distinguen entre todas y las asignadas individualmente. Los roles con usuarios asignados no se pueden eliminar.
+En Configuración > Roles se gestionan los permisos agrupados por módulo, indicando si son globales o por sucursal. Cada módulo permite seleccionar todos los permisos que el gestor puede delegar; los demás aparecen deshabilitados. En Configuración > Usuarios se asignan las sucursales a cada usuario; el acceso requiere que el rol tenga el permiso correspondiente y que la sucursal esté asignada al usuario. La administración puede delegarse únicamente dentro del alcance propio; el rol administrador está protegido y mantiene acceso global. Los permisos de cajas distinguen entre todas y las asignadas individualmente. Los roles con usuarios asignados no se pueden eliminar.
 
 En Configuración > Sucursales pueden crearse, editarse, desactivarse o reactivarse sucursales según los permisos. Al desactivar una sucursal se conservan sus datos y asignaciones, pero no se pueden crear ni trasladar cajas o cuentas a ella.
 
@@ -23,6 +27,6 @@ En Cajas se pueden consultar y filtrar las cajas por sucursal y, según los perm
 
 En Configuración > Ubicaciones, los usuarios autorizados pueden crear, editar, desactivar y reactivar departamentos y municipios. Los códigos existentes no se pueden cambiar. Las ubicaciones desactivadas conservan las asociaciones existentes, pero no se pueden asignar a nuevas sucursales. El catálogo parte de DIVIPOLA con corte de 2024, admite ediciones manuales y no se actualiza automáticamente.
 
-Las confirmaciones para desactivar o reactivar usuarios y ubicaciones usan SweetAlert2.
+Las confirmaciones para cerrar sesión y para desactivar o reactivar usuarios y ubicaciones usan SweetAlert2.
 
 Para validar: `npm run build` y `npm run lint`.

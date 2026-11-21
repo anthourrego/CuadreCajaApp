@@ -7,6 +7,7 @@ use App\Models\CashRegister;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -104,6 +105,68 @@ class UserManagementTest extends TestCase
         ])->assertOk();
 
         $this->assertDatabaseMissing('personal_access_tokens', ['tokenable_id' => $user->id]);
+    }
+
+    public function test_users_without_management_permissions_can_edit_only_their_own_profile(): void
+    {
+        $user = User::factory()->create(['role_id' => Role::findByName('cajero', 'web')->id]);
+        $other = User::factory()->create();
+        $this->putJson('/api/user/profile', [])->assertUnauthorized();
+
+        $this->actingAs($user, 'sanctum')->putJson('/api/user/profile', [
+            'name' => 'Nuevo nombre', 'email' => 'nuevo@example.test',
+            'role_id' => Role::findByName('admin', 'web')->id, 'is_active' => false,
+        ])->assertOk()->assertJsonPath('name', 'Nuevo nombre')
+            ->assertJsonPath('username', $user->username)->assertJsonPath('role.name', 'cajero')
+            ->assertJsonPath('is_active', true);
+        $this->putJson('/api/user/profile', [
+            'name' => 'Nuevo nombre', 'email' => $other->email,
+        ])->assertUnprocessable()->assertJsonValidationErrors('email');
+        $this->putJson('/api/user/profile', [
+            'name' => 'Intento', 'username' => 'otro.usuario', 'email' => 'nuevo@example.test',
+        ])->assertUnprocessable()->assertJsonValidationErrors('username');
+        $this->assertSame('Nuevo nombre', $user->fresh()->name);
+        $this->assertSame($user->username, $user->fresh()->username);
+    }
+
+    public function test_admin_cannot_change_an_existing_username(): void
+    {
+        $admin = User::factory()->create(['role_id' => Role::findByName('admin', 'web')->id]);
+        $user = User::factory()->create();
+
+        $this->actingAs($admin, 'sanctum')->putJson("/api/users/{$user->id}", [
+            'username' => 'nuevo.usuario', 'name' => 'Intento',
+        ])->assertUnprocessable()->assertJsonValidationErrors('username');
+        $this->assertSame($user->username, $user->fresh()->username);
+        $this->assertSame($user->name, $user->fresh()->name);
+        $this->putJson("/api/users/{$user->id}", ['name' => 'Actualizado'])
+            ->assertOk()->assertJsonPath('username', $user->username);
+    }
+
+    public function test_changing_own_password_requires_current_password_and_revokes_all_tokens(): void
+    {
+        $user = User::factory()->create(['password' => 'contraseña-anterior']);
+        $token = $user->createToken('test')->plainTextToken;
+        $user->createToken('other');
+        $payload = [
+            'current_password' => 'incorrecta',
+            'password' => 'contraseña-nueva-123',
+            'password_confirmation' => 'contraseña-nueva-123',
+        ];
+        $this->withToken($token)->putJson('/api/user/password', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('current_password');
+        $this->assertSame(2, $user->tokens()->count());
+        $payload['current_password'] = 'contraseña-anterior';
+        $payload['password_confirmation'] = 'no-coincide';
+        $this->putJson('/api/user/password', $payload)
+            ->assertUnprocessable()->assertJsonValidationErrors('password');
+        $payload['password_confirmation'] = $payload['password'];
+        $this->putJson('/api/user/password', $payload)->assertOk();
+        $this->assertTrue(Hash::check($payload['password'], $user->fresh()->password));
+        $this->assertSame(0, $user->tokens()->count());
+        app('auth')->forgetGuards();
+        $this->withToken($token)->getJson('/api/user')->assertUnauthorized();
+        $this->postJson('/api/login', ['username' => $user->username, 'password' => $payload['password']])->assertOk();
     }
 
     public function test_users_require_exactly_one_valid_role(): void

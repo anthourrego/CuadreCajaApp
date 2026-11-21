@@ -27,7 +27,7 @@ No hay registro público. Los usuarios autorizados pueden crear usuarios, config
 
 Las sucursales pueden desactivarse o reactivarse con `PUT /api/branches/{branch}` y `is_active`. Sus roles, cajas y cuentas se conservan y se pueden consultar; no se pueden crear ni trasladar cajas o cuentas a una sucursal inactiva. Se pueden editar las configuraciones existentes. Al implementar operaciones financieras o cuadres, también deberán rechazar nuevas operaciones en sucursales inactivas.
 
-`DatabaseSeeder` crea inicialmente la sucursal **Sucursal principal** con código `001`. Las sucursales se asignan directamente a usuarios; el seeder no asigna la sucursal inicial ni cambia sucursales o membresías existentes al volver a ejecutarse.
+`DatabaseSeeder` crea inicialmente la sucursal **Sucursal principal** con código `001` y, al crear el administrador inicial, se la asigna como sucursal por defecto. Las sucursales se asignan directamente a usuarios; volver a ejecutar los seeders no modifica las sucursales ni las asignaciones existentes.
 
 Cada usuario tiene exactamente un rol, guardado en `users.role_id` con clave foránea a `roles`. La API recibe `role_id` y `branch_ids` en `POST|PUT /api/users` y devuelve `role_id`, `role` y las sucursales asignadas; el campo anterior `roles` ya no se acepta. Las sucursales del usuario se guardan en la tabla pivote `branch_user`. Los roles solo definen permisos y la API rechaza `branch_ids` en `POST|PUT /api/roles`. Para usuarios que no sean administradores, acceder a una sucursal requiere tanto el permiso del rol como una asignación directa en `branch_user`. La sucursal por defecto debe estar activa y asignada al usuario. Ver cajas asignadas requiere además asignación individual; ver todas las cajas es un permiso independiente. El rol `admin` siempre tiene acceso global y no puede modificarse ni eliminarse.
 
@@ -39,7 +39,9 @@ El acceso a sucursales se administra exclusivamente por usuario mediante `branch
 
 Un administrador puede desactivar o reactivar usuarios con `PUT /api/users/{user}` y `is_active`. Desactivar revoca sus tokens y bloquea el acceso; cambiar la contraseña también revoca los tokens. Una cuenta no puede desactivarse a sí misma y debe mantenerse al menos un administrador activo.
 
-El inicio de sesión usa `username` y `password`; el correo se conserva como dato de contacto. El usuario es único, tiene entre 3 y 64 caracteres y admite letras ASCII, números, puntos, guiones y guiones bajos. Se guarda en minúsculas y no distingue mayúsculas al iniciar sesión. La migración asigna `usuario_<id>` a las cuentas existentes, que un administrador puede actualizar en `PUT /api/users/{user}`.
+Todo usuario autenticado puede actualizar su nombre y correo mediante `PUT /api/user/profile`. Para cambiar su contraseña con `PUT /api/user/password` debe proporcionar la contraseña actual y confirmar una nueva de al menos 12 caracteres; el cambio revoca todas sus sesiones y requiere iniciar sesión nuevamente.
+
+El inicio de sesión usa `username` y `password`; el correo se conserva como dato de contacto. El usuario es único, tiene entre 3 y 64 caracteres y admite letras ASCII, números, puntos, guiones y guiones bajos. Se guarda en minúsculas y no distingue mayúsculas al iniciar sesión. Se define al crear la cuenta y no puede modificarse después; `PUT /api/user/profile` y `PUT /api/users/{user}` rechazan el campo `username`. La migración asigna `usuario_<id>` a las cuentas existentes.
 
 ### Ubicación de sucursales
 

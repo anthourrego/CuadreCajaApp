@@ -15,6 +15,8 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:5,
 Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
+    Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+    Route::put('/user/password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,1');
     Route::get('/departments', [LocationController::class, 'departments']);
     Route::get('/departments/{department}/municipalities', [LocationController::class, 'municipalities']);
     Route::post('/departments', [LocationController::class, 'storeDepartment']);

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { ApiError, request } from './api'
 import type { User } from './api'
 import UserManagement from './UserManagement'
+import ProfileManagement from './ProfileManagement'
 import LocationManagement from './LocationManagement'
 import BranchManagement from './BranchManagement'
 import type { Branch } from './BranchManagement'
@@ -14,6 +15,7 @@ import './Workspace.css'
 
 type Account = { id: number; name: string; type: string; is_active: boolean; branch: { name: string } }
 type Section = 'inicio' | 'sucursales' | 'cajas' | 'cuentas' | 'usuarios' | 'ubicaciones' | 'roles'
+const accountsSectionEnabled = false
 const settingsSections: Section[] = ['ubicaciones', 'sucursales', 'roles', 'usuarios']
 type Resource<T> =
   | { status: 'loading' }
@@ -92,11 +94,12 @@ function RecordRow({ title, detail, status }: { title: string; detail: string; s
   )
 }
 
-function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, logoutBusy, logoutError }: {
+function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordChanged, onLogout, logoutBusy, logoutError }: {
   token: string
   user: User
   onUserUpdated: (user: User) => void
   onSessionExpired: () => void
+  onPasswordChanged: () => void
   onLogout: () => void
   logoutBusy: boolean
   logoutError: string
@@ -105,13 +108,18 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileMode, setProfileMode] = useState<'perfil' | 'contrasena' | null>(null)
+  const [profileNotice, setProfileNotice] = useState('')
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null)
   const sidebarRef = useRef<HTMLElement>(null)
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const can = (permission: string) => user.permissions.includes(permission)
   const canViewBranches = can('branches.view') || can('branches.create')
   const canViewRegisters = can('registers.view_all') || can('registers.view_assigned') || can('registers.create')
-  const canViewAccounts = can('accounts.view')
+  const canViewAccounts = accountsSectionEnabled && can('accounts.view')
   const canManageUsers = can('users.manage')
   const canManageRoles = can('roles.manage')
   const canManageLocations = can('locations.manage')
@@ -142,6 +150,25 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
         else setRefreshError(error instanceof Error ? error.message : 'No se pudieron actualizar tus permisos.')
       })
   }
+
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const handleClick = (event: PointerEvent) => {
+      if (event.target instanceof Node && !userMenuRef.current?.contains(event.target)) setUserMenuOpen(false)
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false)
+        userMenuButtonRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', handleClick)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handleClick)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [userMenuOpen])
 
   useEffect(() => {
     if (!mobileMenuOpen) return
@@ -187,6 +214,18 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
     setSection(item)
     if (settingsSections.includes(item)) setSettingsOpen(true)
     setMobileMenuOpen(false)
+    setUserMenuOpen(false)
+  }
+
+  function openProfile(mode: 'perfil' | 'contrasena') {
+    setUserMenuOpen(false)
+    setProfileNotice('')
+    setProfileMode(mode)
+  }
+
+  function closeProfile() {
+    setProfileMode(null)
+    window.requestAnimationFrame(() => userMenuButtonRef.current?.focus())
   }
 
   const summaries = [
@@ -255,7 +294,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
                 </button>}
                 {canManageRoles && <button type="button" title="Roles" aria-label="Roles" className={section === 'roles' ? 'selected' : ''} aria-current={section === 'roles' ? 'page' : undefined} onClick={() => navigate('roles')}>
                   <span className="submenu-icon" aria-hidden="true">♙</span>
-                  <span className="nav-label submenu-copy"><span>Roles</span><small>Permisos y sucursales</small></span>
+                  <span className="nav-label submenu-copy"><span>Roles</span><small>Permisos por módulo</small></span>
                 </button>}
                 {canManageUsers && <button type="button" title="Usuarios" aria-label="Usuarios" className={section === 'usuarios' ? 'selected' : ''} aria-current={section === 'usuarios' ? 'page' : undefined} onClick={() => navigate('usuarios')}>
                   <span className="submenu-icon" aria-hidden="true">♙</span>
@@ -277,14 +316,23 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
             <div className="header-title"><span className="header-overline">MI ESPACIO</span><strong>{labels[section]}</strong></div>
           </div>
           <div className="header-actions">
-            <div className="header-user"><span className="user-avatar">{user.name.charAt(0).toUpperCase()}</span><div><strong>{user.name}</strong><span>{user.role.name}</span></div></div>
-            <button className="logout-button" type="button" disabled={logoutBusy} onClick={onLogout}>{logoutBusy ? 'Cerrando...' : 'Cerrar sesión'}</button>
+            <div className="user-menu" ref={userMenuRef}>
+              <button ref={userMenuButtonRef} className="header-user" type="button" aria-label="Opciones de usuario" aria-expanded={userMenuOpen} aria-controls="user-menu-options" onClick={() => setUserMenuOpen((open) => !open)}>
+                <span className="user-avatar">{user.name.charAt(0).toUpperCase()}</span><div><strong>{user.name}</strong><span>{user.role.name}</span></div><span aria-hidden="true">▾</span>
+              </button>
+              {userMenuOpen && <div className="user-menu-options" id="user-menu-options">
+                <button type="button" onClick={() => openProfile('perfil')}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>Editar perfil</button>
+                <button type="button" onClick={() => openProfile('contrasena')}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2" /></svg>Cambiar contraseña</button>
+                <button type="button" disabled={logoutBusy} onClick={onLogout}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M10 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4M14 8l4 4-4 4M8 12h10" /></svg>{logoutBusy ? 'Cerrando...' : 'Cerrar sesión'}</button>
+              </div>}
+            </div>
           </div>
         </header>
 
         <main className="workspace-content">
           {logoutError && <p className="error" role="alert">{logoutError}</p>}
           {refreshError && <p className="error" role="alert">{refreshError}</p>}
+          {profileNotice && <p className="user-notice" role="status">{profileNotice}</p>}
           {section === 'inicio' ? (
             <>
               <div className="welcome-panel">
@@ -307,7 +355,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
             </>
           ) : (
             <>
-              <div className="section-heading"><div><span className="workspace-kicker">{settingsSections.includes(section) ? 'CONFIGURACIÓN' : 'MI ORGANIZACIÓN'}</span><h1>{labels[section]}</h1><p>{section === 'usuarios' ? 'Gestiona los usuarios y su rol.' : section === 'roles' ? 'Administra permisos y sucursales por rol.' : section === 'ubicaciones' ? 'Administra los departamentos y municipios.' : section === 'sucursales' ? 'Consulta y administra tus sucursales según tus permisos.' : 'Consulta la información disponible para tu usuario.'}</p></div></div>
+              <div className="section-heading"><div><span className="workspace-kicker">{settingsSections.includes(section) ? 'CONFIGURACIÓN' : 'MI ORGANIZACIÓN'}</span><h1>{labels[section]}</h1><p>{section === 'usuarios' ? 'Gestiona los usuarios y su rol.' : section === 'roles' ? 'Administra los permisos de cada rol.' : section === 'ubicaciones' ? 'Administra los departamentos y municipios.' : section === 'sucursales' ? 'Consulta y administra tus sucursales según tus permisos.' : 'Consulta la información disponible para tu usuario.'}</p></div></div>
               <section className="records-panel" aria-label={`Listado de ${labels[section].toLowerCase()}`}>
                 <div className="records-heading"><h2>{section === 'ubicaciones' ? 'Ubicaciones' : `Listado de ${labels[section].toLowerCase()}`}</h2>{section === 'cuentas' && <span>Solo consulta</span>}</div>
                 {section === 'sucursales' && (branches.resource.status === 'ready'
@@ -323,7 +371,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
                     ? <ResourceView resource={roles.resource} reload={roles.reload} empty="No hay roles disponibles." render={() => null} />
                   : <ResourceView resource={users.resource} reload={users.reload} empty="No hay usuarios registrados." render={() => null} />)}
                 {section === 'roles' && canManageRoles && (roles.resource.status === 'ready'
-                  ? <RoleManagement token={token} roles={roles.resource.data} onSaved={refreshAfterRoleChange} onSessionExpired={onSessionExpired} />
+                  ? <RoleManagement token={token} roles={roles.resource.data} availablePermissions={user.permissions} onSaved={refreshAfterRoleChange} onSessionExpired={onSessionExpired} />
                   : <ResourceView resource={roles.resource} reload={roles.reload} empty="No hay roles disponibles." render={() => null} />)}
                 {section === 'ubicaciones' && canManageLocations && <LocationManagement token={token} onSessionExpired={onSessionExpired} />}
               </section>
@@ -332,6 +380,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onLogout, log
         </main>
         <footer className="workspace-footer">CuadreCaja <span>·</span> Un espacio para tu negocio</footer>
       </div>
+      {profileMode && <ProfileManagement key={profileMode} mode={profileMode} user={user} token={token} onClose={closeProfile} onUserUpdated={(updated) => { onUserUpdated(updated); if (canManageUsers) users.reload(); setProfileNotice('Perfil actualizado correctamente.') }} onSessionExpired={onSessionExpired} onPasswordChanged={onPasswordChanged} />}
     </div>
   )
 }

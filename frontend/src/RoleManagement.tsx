@@ -11,9 +11,20 @@ type Options = {
   branch: Record<string, string>
 }
 
-function RoleManagement({ token, roles, onSaved, onSessionExpired }: {
+type PermissionOption = { key: string; label: string; scope: 'Global' | 'Por sucursal' }
+const modules = [
+  { prefix: 'branches', label: 'Sucursales' },
+  { prefix: 'registers', label: 'Cajas' },
+  { prefix: 'users', label: 'Usuarios' },
+  { prefix: 'roles', label: 'Roles' },
+  { prefix: 'locations', label: 'Ubicaciones' },
+  { prefix: 'accounts', label: 'Cuentas' },
+]
+
+function RoleManagement({ token, roles, availablePermissions, onSaved, onSessionExpired }: {
   token: string
   roles: Role[]
+  availablePermissions: string[]
   onSaved: () => void
   onSessionExpired: () => void
 }) {
@@ -100,10 +111,34 @@ function RoleManagement({ token, roles, onSaved, onSessionExpired }: {
     }
   }
 
-  function permissionGroup(title: string, entries: Record<string, string>) {
-    return <fieldset className="branch-users"><legend>{title}</legend><div className="branch-user-list">{Object.entries(entries).map(([key, label]) => (
-      <label key={key}><input type="checkbox" checked={permissions.includes(key)} onChange={(event) => setPermissions(event.target.checked ? [...permissions, key] : permissions.filter((item) => item !== key))} /><span>{label}</span></label>
-    ))}</div></fieldset>
+  function permissionTree(options: Options) {
+    const entries: PermissionOption[] = [
+      ...Object.entries(options.global).map(([key, label]) => ({ key, label, scope: 'Global' as const })),
+      ...Object.entries(options.branch).map(([key, label]) => ({ key, label, scope: 'Por sucursal' as const })),
+    ]
+    const groups = modules.map(({ prefix, label }) => ({ label, entries: entries.filter((entry) => entry.key.startsWith(`${prefix}.`)) }))
+    const other = entries.filter((entry) => !modules.some(({ prefix }) => entry.key.startsWith(`${prefix}.`)))
+    if (other.length) groups.push({ label: 'Otros permisos', entries: other })
+
+    return <div className="permission-tree">{groups.filter((group) => group.entries.length > 0).map((group) => {
+      const available = group.entries.filter((entry) => availablePermissions.includes(entry.key)).map((entry) => entry.key)
+      const selected = available.filter((key) => permissions.includes(key)).length
+      return <details key={group.label} className="permission-module" open>
+        <summary><span>{group.label}</span><small>{group.entries.filter((entry) => permissions.includes(entry.key)).length} de {group.entries.length} seleccionados</small></summary>
+        <div className="permission-module-content">
+          <label className="permission-select-all"><input type="checkbox" checked={available.length > 0 && selected === available.length} disabled={busy || available.length === 0} ref={(input) => { if (input) input.indeterminate = selected > 0 && selected < available.length }} onChange={(event) => {
+            const checked = event.target.checked
+            setPermissions((current) => checked ? [...current, ...available.filter((key) => !current.includes(key))] : current.filter((key) => !available.includes(key)))
+          }} />Seleccionar todos los permisos disponibles</label>
+          <div className="permission-list">{group.entries.map(({ key, label, scope }) => (
+            <label key={key} className="permission-item"><input type="checkbox" disabled={busy || !availablePermissions.includes(key)} checked={permissions.includes(key)} onChange={(event) => {
+              const checked = event.target.checked
+              setPermissions((current) => checked ? [...current, key] : current.filter((item) => item !== key))
+            }} /><span>{label}</span><small>{scope}</small></label>
+          ))}</div>
+        </div>
+      </details>
+    })}</div>
   }
 
   return <div className="user-management branch-management">
@@ -113,8 +148,7 @@ function RoleManagement({ token, roles, onSaved, onSessionExpired }: {
       <form className="user-form" onSubmit={submit}>
         <div className="user-form-heading"><h2>{editing === 'new' ? 'Crear rol' : 'Editar rol'}</h2><p>Los roles definen permisos; el acceso a sucursales se asigna a cada usuario. Solo puedes delegar permisos dentro de tu alcance.</p></div>
         <div className="user-fields"><div className="user-field"><label htmlFor="role-name">Nombre del rol</label><input id="role-name" required minLength={3} maxLength={100} pattern={'[a-z0-9._\\-]+'} readOnly={editing !== 'new' && ['supervisor', 'cajero'].includes(editing.name)} value={name} onChange={(event) => setName(event.target.value)} /><small>Letras minúsculas, números, puntos, guiones y guiones bajos.</small></div></div>
-        {permissionGroup('Permisos globales', options.global)}
-        {permissionGroup('Permisos por sucursal', options.branch)}
+        {permissionTree(options)}
         <div className="user-form-actions"><button className="user-primary" disabled={busy} type="submit">{busy ? 'Guardando...' : 'Guardar rol'}</button><button className="user-secondary" disabled={busy} type="button" onClick={() => { setEditing(null); setError('') }}>Cancelar</button></div>
       </form>
     ) : <>

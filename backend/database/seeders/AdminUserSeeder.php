@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Branch;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use LogicException;
 
@@ -31,15 +33,20 @@ class AdminUserSeeder extends Seeder
 
         $password = Str::random(48);
         $role = Role::where('name', 'admin')->where('guard_name', 'web')->firstOrFail();
+        $branch = Branch::where('code', '001')->where('is_active', true)->firstOrFail();
 
-        User::create([
-            'name' => 'Administrador',
-            'username' => $username,
-            'email' => $email,
-            'password' => $password,
-            'role_id' => $role->id,
-            'is_active' => true,
-        ]);
+        DB::transaction(function () use ($username, $email, $password, $role, $branch) {
+            $user = User::create([
+                'name' => 'Administrador',
+                'username' => $username,
+                'email' => $email,
+                'password' => $password,
+                'role_id' => $role->id,
+                'default_branch_id' => $branch->id,
+                'is_active' => true,
+            ]);
+            $user->branches()->attach($branch);
+        });
 
         $this->command?->info('Se creó el administrador inicial.');
         $this->command?->line("Usuario: {$username}");

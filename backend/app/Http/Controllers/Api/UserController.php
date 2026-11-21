@@ -22,6 +22,7 @@ class UserController extends Controller
         'username.max' => 'El usuario no puede superar 64 caracteres.',
         'username.regex' => 'El usuario solo admite letras, números, puntos, guiones y guiones bajos.',
         'username.unique' => 'El nombre de usuario ya está en uso.',
+        'username.missing' => 'El nombre de usuario no se puede modificar.',
         'email.required' => 'El correo electrónico es obligatorio.',
         'email.email' => 'El correo electrónico no es válido.',
         'email.unique' => 'El correo electrónico ya está en uso.',
@@ -81,10 +82,9 @@ class UserController extends Controller
     public function update(Request $request, User $user): JsonResponse
     {
         $this->ensureManage($request);
-        $this->normalizeUsername($request);
         $data = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'username' => ['sometimes', 'required', 'string', 'min:3', 'max:64', 'regex:/^[a-z0-9._-]+$/', Rule::unique('users', 'username')->ignore($user->id)],
+            'username' => ['missing'],
             'email' => ['sometimes', 'required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
             'password' => ['sometimes', 'required', 'string', 'min:12', 'confirmed'],
             'is_active' => ['sometimes', 'boolean'],

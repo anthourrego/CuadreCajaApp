@@ -101,7 +101,8 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
     setBusy(true)
     try {
       const data = {
-        name: name.trim(), username: username.trim(), email: email.trim(), role_id: Number(roleId),
+        name: name.trim(), email: email.trim(), role_id: Number(roleId),
+        ...(editing === 'new' ? { username: username.trim() } : {}),
         branch_ids: selectedBranchIds,
         default_branch_id: selectedBranchId ? Number(selectedBranchId) : null,
         ...(password ? { password, password_confirmation: confirmation } : {}),
@@ -170,7 +171,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
           <div className="user-form-heading"><div><h2>{editing === 'new' ? 'Crear usuario' : 'Editar usuario'}</h2><p>Completa la información y asigna un rol de acceso.</p></div></div>
           <div className="user-fields">
             <div className="user-field"><label htmlFor="user-name">Nombre completo</label><input id="user-name" required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} /></div>
-            <div className="user-field"><label htmlFor="user-username">Usuario</label><input id="user-username" required minLength={3} maxLength={64} pattern={'[A-Za-z0-9._\\-]+'} autoCapitalize="none" autoComplete="off" value={username} onChange={(event) => setUsername(event.target.value)} /><small>Letras, números, puntos, guiones y guiones bajos.</small></div>
+            <div className="user-field"><label htmlFor="user-username">Usuario</label><input id="user-username" required minLength={3} maxLength={64} pattern={'[A-Za-z0-9._\\-]+'} autoCapitalize="none" autoComplete="off" value={username} readOnly={editing !== 'new'} onChange={(event) => setUsername(event.target.value)} /><small>{editing === 'new' ? 'Letras, números, puntos, guiones y guiones bajos. No se podrá modificar después de crear el usuario.' : 'El nombre de usuario no se puede modificar.'}</small></div>
             <div className="user-field"><label htmlFor="user-email">Correo electrónico</label><input id="user-email" type="email" required maxLength={255} value={email} onChange={(event) => setEmail(event.target.value)} /></div>
             <div className="user-field"><label htmlFor="user-password">{editing === 'new' ? 'Contraseña' : 'Nueva contraseña (opcional)'}</label><input id="user-password" type="password" autoComplete="new-password" required={editing === 'new'} minLength={12} value={password} onChange={(event) => setPassword(event.target.value)} /><small>Mínimo 12 caracteres. Al cambiarla se cierran las sesiones existentes.</small></div>
             <div className="user-field"><label htmlFor="user-confirm">Confirmar contraseña</label><input id="user-confirm" type="password" autoComplete="new-password" required={editing === 'new' || Boolean(password)} minLength={12} value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></div>

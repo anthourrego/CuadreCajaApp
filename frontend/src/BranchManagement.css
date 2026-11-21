@@ -9,3 +9,18 @@
 .branch-user-list span { min-width: 0; display: flex; flex-direction: column; gap: 3px; overflow-wrap: anywhere; }
 .branch-user-list strong { font-size: 12px; }
 .branch-user-list small { color: #75859a; font-size: 11px; }
+.permission-tree { display: grid; gap: 10px; }
+.permission-module { border: 1px solid #e8edf5; border-radius: 8px; }
+.permission-module summary { display: flex; align-items: center; gap: 10px; padding: 14px; color: #2a3956; font-size: 13px; font-weight: 700; cursor: pointer; }
+.permission-module summary::before { content: '▸'; color: #5279ad; }
+.permission-module[open] summary::before { content: '▾'; }
+.permission-module summary small { margin-left: auto; color: #75859a; font-size: 11px; font-weight: 500; }
+.permission-module summary:focus-visible { outline: 2px solid #245cbb; outline-offset: -2px; }
+.permission-module-content { padding: 0 14px 14px 28px; }
+.permission-select-all, .permission-item { display: flex; align-items: center; gap: 9px; color: #304466; font-size: 13px; }
+.permission-select-all { padding: 8px 0; font-weight: 700; }
+.permission-list { display: grid; gap: 5px; border-left: 1px solid #dfe5ef; padding-left: 14px; }
+.permission-item { padding: 8px 0; }
+.permission-item span { flex: 1; }
+.permission-item small { color: #75859a; font-size: 11px; white-space: nowrap; }
+.permission-item:has(input:disabled), .permission-select-all:has(input:disabled) { opacity: .6; }

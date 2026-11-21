@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
 import type { User } from './api'
 import illustration from './assets/contabilidad.png'
@@ -24,6 +25,13 @@ function App() {
     setToken(null)
     setUser(null)
     setError('Tu sesión ha expirado. Inicia sesión nuevamente.')
+  }, [])
+
+  const passwordChanged = useCallback(() => {
+    sessionStorage.removeItem(tokenKey)
+    setToken(null)
+    setUser(null)
+    setError('Contraseña actualizada. Inicia sesión nuevamente.')
   }, [])
 
   useEffect(() => {
@@ -72,6 +80,19 @@ function App() {
 
   async function handleLogout() {
     if (!token) return
+    const confirmation = await Swal.fire({
+      title: '¿Deseas cerrar sesión?',
+      text: 'Tendrás que iniciar sesión nuevamente para acceder.',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Sí, cerrar sesión',
+      cancelButtonText: 'Cancelar',
+      confirmButtonColor: '#14284f',
+      cancelButtonColor: '#66758b',
+      focusCancel: true,
+      heightAuto: false,
+    })
+    if (!confirmation.isConfirmed) return
     setBusy(true)
     setError('')
     try {
@@ -94,7 +115,7 @@ function App() {
   }
 
   if (token && user && !checking) {
-    return <Workspace token={token} user={user} onUserUpdated={setUser} onSessionExpired={expireSession} onLogout={handleLogout} logoutBusy={busy} logoutError={error} />
+    return <Workspace token={token} user={user} onUserUpdated={setUser} onSessionExpired={expireSession} onPasswordChanged={passwordChanged} onLogout={handleLogout} logoutBusy={busy} logoutError={error} />
   }
 
   return (

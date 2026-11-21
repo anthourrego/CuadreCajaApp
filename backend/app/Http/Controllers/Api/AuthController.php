@@ -8,6 +8,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
@@ -42,6 +44,48 @@ class AuthController extends Controller
     public function user(Request $request): JsonResponse
     {
         return response()->json($this->userPayload($request->user()));
+    }
+
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'username' => ['missing'],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+        ], [
+            'name.required' => 'El nombre es obligatorio.',
+            'username.missing' => 'El nombre de usuario no se puede modificar.',
+            'email.required' => 'El correo electrónico es obligatorio.',
+            'email.email' => 'El correo electrónico no es válido.',
+            'email.unique' => 'El correo electrónico ya está en uso.',
+        ]);
+        $user->update($data);
+
+        return response()->json($this->userPayload($user));
+    }
+
+    public function updatePassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:12', 'confirmed'],
+        ], [
+            'current_password.required' => 'Ingresa tu contraseña actual.',
+            'password.min' => 'La contraseña debe tener al menos 12 caracteres.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
+        ]);
+
+        DB::transaction(function () use ($request, $data) {
+            $user = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            if (! Hash::check($data['current_password'], $user->password)) {
+                throw ValidationException::withMessages(['current_password' => 'La contraseña actual es incorrecta.']);
+            }
+            $user->update(['password' => $data['password']]);
+            $user->tokens()->delete();
+        });
+
+        return response()->json(['message' => 'Contraseña actualizada. Inicia sesión nuevamente.']);
     }
 
     private function userPayload(User $user): array

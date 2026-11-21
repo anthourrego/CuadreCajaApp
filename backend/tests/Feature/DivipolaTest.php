@@ -26,21 +26,28 @@ class DivipolaTest extends TestCase
 
         $this->assertDatabaseCount('branches', 1);
         $this->assertDatabaseHas('branches', ['name' => 'Sucursal principal', 'code' => '001']);
-        $this->assertDatabaseCount('branch_user', 0);
+        $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $admin->id]);
+        $this->assertSame($branch->id, $admin->default_branch_id);
         $this->assertSame('admin', $admin->role->name);
         $this->assertSame('admin@cuadrecaja.test', $admin->email);
+        $this->actingAs($admin, 'sanctum')->getJson('/api/user')
+            ->assertOk()->assertJsonPath('default_branch.id', $branch->id);
     }
 
     public function test_default_admin_seeder_is_idempotent_and_does_not_replace_the_password(): void
     {
-        $this->seed([RoleSeeder::class, AdminUserSeeder::class]);
+        $this->seed([RoleSeeder::class, BranchSeeder::class, AdminUserSeeder::class]);
         $admin = User::where('username', 'admin')->firstOrFail();
         $passwordHash = $admin->password;
+        $admin->update(['default_branch_id' => null]);
+        $admin->branches()->detach();
 
         $this->seed(AdminUserSeeder::class);
 
         $this->assertDatabaseCount('users', 1);
         $this->assertSame($passwordHash, $admin->fresh()->password);
+        $this->assertNull($admin->fresh()->default_branch_id);
+        $this->assertDatabaseCount('branch_user', 0);
     }
 
     public function test_initial_branch_seeder_preserves_existing_branch_changes_when_rerun(): void
