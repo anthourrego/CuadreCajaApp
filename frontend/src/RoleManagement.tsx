@@ -18,6 +18,7 @@ const modules = [
   { prefix: 'users', label: 'Usuarios' },
   { prefix: 'roles', label: 'Roles' },
   { prefix: 'locations', label: 'Ubicaciones' },
+  { prefix: 'expenses', label: 'Gastos' },
   { prefix: 'accounts', label: 'Cuentas' },
 ]
 

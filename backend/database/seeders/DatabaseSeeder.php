@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(BranchSeeder::class);
         $this->call(CashRegisterSeeder::class);
         $this->call(AdminUserSeeder::class);
+        $this->call(ExpenseTypeSeeder::class);
         $this->call(DivipolaSeeder::class);
     }
 }

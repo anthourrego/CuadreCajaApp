@@ -23,6 +23,8 @@ En Configuración > Roles se gestionan los permisos agrupados por módulo, indic
 
 En Configuración > Sucursales pueden crearse, editarse, desactivarse o reactivarse sucursales según los permisos. Al desactivar una sucursal se conservan sus datos y asignaciones, pero no se pueden crear ni trasladar cajas o cuentas a ella.
 
+En Configuración > Tipos de gasto, los usuarios con el permiso correspondiente administran un catálogo global, inicialmente compuesto por Fletes, Gasto Local, Devolución y Vale. Los tipos pueden editarse, desactivarse o reactivarse. El registro de gastos aún no está implementado.
+
 En Cajas se pueden consultar todas las cajas de las sucursales asignadas y, según los permisos del rol, crearlas, editarlas, desactivarlas o reactivarlas. En Configuración > Usuarios se puede asignar una sucursal por defecto entre las sucursales activas asignadas al usuario. Cajas la usa como filtro inicial; cambiar el filtro no cambia la preferencia ni los permisos. Si no hay una sucursal por defecto activa y asignada, se debe elegir un filtro antes de mostrar cajas. La creación requiere una sucursal activa a la que el usuario tenga acceso. El código de caja es único dentro de su sucursal, pero puede repetirse en otras. La edición desde esta pantalla conserva la sucursal y las asignaciones de usuarios existentes; no incluye asignación de responsables.
 
 En Configuración > Ubicaciones, los usuarios autorizados pueden crear, editar, desactivar y reactivar departamentos y municipios. Los códigos existentes no se pueden cambiar. Las ubicaciones desactivadas conservan las asociaciones existentes, pero no se pueden asignar a nuevas sucursales. El catálogo parte de DIVIPOLA con corte de 2024, admite ediciones manuales y no se actualiza automáticamente.

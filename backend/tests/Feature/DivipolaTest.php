@@ -31,6 +31,8 @@ class DivipolaTest extends TestCase
         $this->assertDatabaseHas('branches', ['name' => 'Sucursal principal', 'code' => '001']);
         $this->assertDatabaseCount('cash_registers', 1);
         $this->assertDatabaseHas('cash_registers', ['id' => $register->id, 'name' => 'Caja principal', 'is_active' => true]);
+        $this->assertDatabaseCount('expense_types', 4);
+        $this->assertDatabaseHas('expense_types', ['name' => 'Devolución', 'is_active' => true]);
         $this->assertDatabaseCount('cash_register_user', 0);
         $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $admin->id]);
         $this->assertSame($branch->id, $admin->default_branch_id);

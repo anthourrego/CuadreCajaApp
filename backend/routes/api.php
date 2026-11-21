@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CashRegisterController;
+use App\Http\Controllers\Api\ExpenseTypeController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\UserController;
@@ -23,6 +24,9 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::put('/departments/{department}', [LocationController::class, 'updateDepartment']);
     Route::post('/municipalities', [LocationController::class, 'storeMunicipality']);
     Route::put('/municipalities/{municipality}', [LocationController::class, 'updateMunicipality']);
+    Route::apiResource('expense-types', ExpenseTypeController::class)
+        ->parameters(['expense-types' => 'expenseType'])
+        ->only(['index', 'store', 'update']);
 
     Route::apiResource('branches', BranchController::class)->only(['index', 'store', 'show', 'update']);
     Route::apiResource('accounts', AccountController::class)->only(['index', 'store', 'show', 'update']);

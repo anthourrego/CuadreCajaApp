@@ -5,6 +5,7 @@ import type { User } from './api'
 import UserManagement from './UserManagement'
 import ProfileManagement from './ProfileManagement'
 import LocationManagement from './LocationManagement'
+import ExpenseTypeManagement from './ExpenseTypeManagement'
 import BranchManagement from './BranchManagement'
 import type { Branch } from './BranchManagement'
 import RoleManagement from './RoleManagement'
@@ -14,9 +15,9 @@ import type { Register } from './CashRegisterManagement'
 import './Workspace.css'
 
 type Account = { id: number; name: string; type: string; is_active: boolean; branch: { name: string } }
-type Section = 'inicio' | 'sucursales' | 'cajas' | 'cuentas' | 'usuarios' | 'ubicaciones' | 'roles'
+type Section = 'inicio' | 'sucursales' | 'cajas' | 'cuentas' | 'usuarios' | 'ubicaciones' | 'roles' | 'tipos-gasto'
 const accountsSectionEnabled = false
-const settingsSections: Section[] = ['ubicaciones', 'sucursales', 'roles', 'usuarios']
+const settingsSections: Section[] = ['ubicaciones', 'sucursales', 'roles', 'usuarios', 'tipos-gasto']
 type Resource<T> =
   | { status: 'loading' }
   | { status: 'ready'; data: T[] }
@@ -30,6 +31,7 @@ const labels: Record<Section, string> = {
   usuarios: 'Usuarios',
   ubicaciones: 'Ubicaciones',
   roles: 'Roles',
+  'tipos-gasto': 'Tipos de gasto',
 }
 
 const accountTypes: Record<string, string> = {
@@ -122,6 +124,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   const canManageUsers = can('users.manage')
   const canManageRoles = can('roles.manage')
   const canManageLocations = can('locations.manage')
+  const canManageExpenseTypes = can('expenses.manage_types')
   const [refreshError, setRefreshError] = useState('')
   const branches = useResource<Branch>('/branches', token, canViewBranches, onSessionExpired)
   const registers = useResource<Register>('/registers', token, true, onSessionExpired)
@@ -263,7 +266,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
               <span className="nav-label">{labels[item]}</span>
             </button>
           ))}
-          {(canManageLocations || canViewBranches || canManageRoles || canManageUsers) && (
+          {(canManageLocations || canViewBranches || canManageRoles || canManageUsers || canManageExpenseTypes) && (
             <div className="nav-group">
               <button type="button" className={settingsSections.includes(section) ? 'nav-group-active' : ''} title="Configuración" aria-label="Configuración" aria-expanded={settingsOpen} aria-controls="settings-navigation" onClick={() => {
                 if (sidebarCollapsed && window.matchMedia('(min-width: 761px)').matches) {
@@ -289,6 +292,10 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
                 {canViewBranches && <button type="button" title="Sucursales" aria-label="Sucursales" className={section === 'sucursales' ? 'selected' : ''} aria-current={section === 'sucursales' ? 'page' : undefined} onClick={() => navigate('sucursales')}>
                   <span className="submenu-icon" aria-hidden="true">▦</span>
                   <span className="nav-label submenu-copy"><span>Sucursales</span><small>Puntos del negocio</small></span>
+                </button>}
+                {canManageExpenseTypes && <button type="button" title="Tipos de gasto" aria-label="Tipos de gasto" className={section === 'tipos-gasto' ? 'selected' : ''} aria-current={section === 'tipos-gasto' ? 'page' : undefined} onClick={() => navigate('tipos-gasto')}>
+                  <span className="submenu-icon" aria-hidden="true">$</span>
+                  <span className="nav-label submenu-copy"><span>Tipos de gasto</span><small>Catálogo global</small></span>
                 </button>}
                 {canManageRoles && <button type="button" title="Roles" aria-label="Roles" className={section === 'roles' ? 'selected' : ''} aria-current={section === 'roles' ? 'page' : undefined} onClick={() => navigate('roles')}>
                   <span className="submenu-icon" aria-hidden="true">♙</span>
@@ -372,6 +379,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
                   ? <RoleManagement token={token} roles={roles.resource.data} availablePermissions={user.permissions} onSaved={refreshAfterRoleChange} onSessionExpired={onSessionExpired} />
                   : <ResourceView resource={roles.resource} reload={roles.reload} empty="No hay roles disponibles." render={() => null} />)}
                 {section === 'ubicaciones' && canManageLocations && <LocationManagement token={token} onSessionExpired={onSessionExpired} />}
+                {section === 'tipos-gasto' && canManageExpenseTypes && <ExpenseTypeManagement token={token} onSessionExpired={onSessionExpired} />}
               </section>
             </>
           )}

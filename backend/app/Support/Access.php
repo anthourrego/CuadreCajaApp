@@ -12,6 +12,7 @@ class Access
         'users.manage' => 'Administrar usuarios',
         'roles.manage' => 'Administrar roles',
         'locations.manage' => 'Administrar ubicaciones',
+        'expenses.manage_types' => 'Administrar tipos de gasto',
         'branches.create' => 'Crear sucursales',
     ];
 
