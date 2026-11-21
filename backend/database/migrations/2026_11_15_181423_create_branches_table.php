@@ -23,10 +23,17 @@ return new class extends Migration
             $table->timestamps();
             $table->primary(['branch_id', 'user_id']);
         });
+
+        Schema::table('users', function (Blueprint $table) {
+            $table->foreignId('default_branch_id')->nullable()->constrained('branches')->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropConstrainedForeignId('default_branch_id');
+        });
         Schema::dropIfExists('branch_user');
         Schema::dropIfExists('branches');
     }

@@ -1,0 +1,40 @@
+.reconciliation-expense-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reconciliation-expense-heading h3 { margin: 0; font-size: 16px; }
+.reconciliation-expense-heading p, .reconciliation-expense-message { margin: 5px 0; color: #78889f; font-size: 13px; }
+.reconciliation-expense-heading > span { color: #53647f; font-size: 13px; white-space: nowrap; }
+.reconciliation-expense-heading strong { color: #14284f; white-space: nowrap; }
+.reconciliation-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.reconciliation-expense-table { width: 100%; margin-top: 12px; border-collapse: collapse; table-layout: fixed; }
+.reconciliation-expense-table col:nth-child(1) { width: 25%; }
+.reconciliation-expense-table col:nth-child(2) { width: 23%; }
+.reconciliation-expense-table col:nth-child(3) { width: 35%; }
+.reconciliation-expense-table col:nth-child(4) { width: 17%; }
+.reconciliation-expense-table th { padding: 8px; color: #53647f; font-size: 12px; text-align: left; }
+.reconciliation-expense-table td { padding: 8px; border-top: 1px solid #dfe5ef; vertical-align: middle; }
+.reconciliation-expense-entry { background: #f5f8fc; }
+.reconciliation-expense-action { min-height: 44px; }
+.reconciliation-expense-error { margin: 8px 0; color: #a42b32; font-size: 13px; }
+.reconciliation-result { margin-top: 20px; padding: 12px 16px; border-radius: 8px; background: #f1f5fb; }
+.reconciliation-result p { margin: 5px 0; }
+.reconciliation-management .record-copy details span { display: block; margin-top: 4px; }
+@media (max-width: 760px) {
+  .reconciliation-expense-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .reconciliation-expense-table, .reconciliation-expense-table tbody { display: block; }
+  .reconciliation-expense-table thead, .reconciliation-expense-table colgroup { display: none; }
+  .reconciliation-expense-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid #dfe5ef; border-radius: 8px; margin-bottom: 10px; }
+  .reconciliation-expense-table td { min-width: 0; padding: 0; border: 0; }
+  .reconciliation-expense-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; color: #53647f; font-size: 12px; font-weight: 700; }
+  .reconciliation-expense-table td:nth-child(3) { grid-column: 1 / -1; }
+}
+.reconciliation-inputs { min-width: 0; margin: 0; padding: 0; border: 0; }
+.reconciliation-inputs:disabled { opacity: .65; }
+.reconciliation-availability { padding: 10px 12px; border-radius: 8px; background: #f1f5fb; color: #304466; font-size: 13px; }
+.reconciliation-availability p { margin: 0; }
+.reconciliation-availability [role="alert"] { color: #a42b32; }
+.reconciliation-availability button { margin-top: 8px; }
+.reconciliation-icon { width: 17px; height: 17px; flex: none; }
+.reconciliation-field-label { display: inline-flex; align-items: center; gap: 7px; }
+.reconciliation-field-label .reconciliation-icon, .reconciliation-expense-heading h3 .reconciliation-icon { color: #5279ad; }
+.reconciliation-expense-heading h3 { display: flex; align-items: center; gap: 7px; }
+.reconciliation-expense-action, .reconciliation-form-action { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.reconciliation-expense-action .reconciliation-icon, .reconciliation-form-action .reconciliation-icon { width: 15px; height: 15px; }

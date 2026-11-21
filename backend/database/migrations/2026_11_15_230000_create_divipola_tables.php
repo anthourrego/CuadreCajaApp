@@ -12,6 +12,7 @@ return new class extends Migration
             $table->char('code', 2)->primary();
             $table->string('name');
             $table->timestamps();
+            $table->boolean('is_active')->default(true);
         });
 
         Schema::create('municipalities', function (Blueprint $table) {
@@ -20,6 +21,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('type');
             $table->timestamps();
+            $table->boolean('is_active')->default(true);
             $table->foreign('department_code')->references('code')->on('departments')->restrictOnDelete();
         });
 

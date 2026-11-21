@@ -7,7 +7,10 @@ use App\Models\Branch;
 use App\Models\CashRegister;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -20,6 +23,21 @@ class PhaseOneApiTest extends TestCase
         parent::setUp();
 
         $this->seed(RoleSeeder::class);
+    }
+
+    public function test_new_database_uses_the_consolidated_schema(): void
+    {
+        $this->assertFalse(Schema::hasTable('cash_register_user'));
+        $this->assertFalse(Schema::hasTable('model_has_roles'));
+        $this->assertTrue(Schema::hasTable('model_has_permissions'));
+        $columns = Schema::getColumnListing('cash_reconciliations');
+        $this->assertSame('expenses_total', $columns[array_search('qr', $columns, true) + 1]);
+        $users = collect(Schema::getColumns('users'))->keyBy('name');
+        $this->assertFalse($users['role_id']['nullable']);
+        $this->assertTrue($users['default_branch_id']['nullable']);
+        $foreignKeys = collect(Schema::getForeignKeys('users'));
+        $this->assertTrue($foreignKeys->contains(fn ($key) => $key['columns'] === ['role_id'] && $key['foreign_table'] === 'roles'));
+        $this->assertTrue($foreignKeys->contains(fn ($key) => $key['columns'] === ['default_branch_id'] && $key['foreign_table'] === 'branches'));
     }
 
     public function test_login_returns_a_token_that_can_access_the_profile(): void
@@ -118,13 +136,8 @@ class PhaseOneApiTest extends TestCase
             'branch_id' => $branchId,
             'name' => 'Caja 1',
             'code' => 'CAJA-1',
-            'user_ids' => [$cashier->id],
         ])->assertCreated()
-            ->assertJsonPath('users.0.id', $cashier->id);
-
-        $this->assertDatabaseHas('cash_register_user', [
-            'user_id' => $cashier->id,
-        ]);
+            ->assertJsonMissingPath('users');
     }
 
     public function test_cashiers_can_read_all_registers_in_assigned_branches_but_not_accounts(): void
@@ -142,7 +155,6 @@ class PhaseOneApiTest extends TestCase
             'name' => 'Otra caja',
             'code' => 'CAJA-2',
         ]);
-        $assignedRegister->users()->attach($cashier);
         $branch->users()->attach($cashier);
         $account = Account::create([
             'branch_id' => $branch->id,
@@ -204,24 +216,51 @@ class PhaseOneApiTest extends TestCase
         $this->getJson('/api/registers')->assertOk()->assertJsonCount(1);
     }
 
-    public function test_register_management_preserves_branch_and_assignments_and_filters_by_branch(): void
+    public function test_register_management_preserves_branch_and_filters_by_branch(): void
     {
         $admin = User::factory()->create(['role_id' => Role::findByName('admin', 'web')->id]);
-        $cashier = User::factory()->create();
         $branch = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $other = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
-        $payload = ['branch_id' => $branch->id, 'name' => 'Caja', 'code' => 'C1', 'user_ids' => [$cashier->id]];
+        $payload = ['branch_id' => $branch->id, 'name' => 'Caja', 'code' => 'C1'];
         $id = $this->actingAs($admin, 'sanctum')->postJson('/api/registers', $payload)
             ->assertCreated()->json('id');
         $this->postJson('/api/registers', $payload)->assertUnprocessable()->assertJsonValidationErrors('code');
         $this->postJson('/api/registers', [...$payload, 'branch_id' => $other->id])->assertCreated();
         $this->putJson("/api/registers/{$id}", ['name' => 'Caja editada', 'code' => 'C2'])
-            ->assertOk()->assertJsonPath('branch_id', $branch->id)->assertJsonPath('users.0.id', $cashier->id);
+            ->assertOk()->assertJsonPath('branch_id', $branch->id)->assertJsonMissingPath('users');
         $this->putJson("/api/registers/{$id}", ['is_active' => false])->assertOk()->assertJsonPath('is_active', false);
         $this->putJson("/api/registers/{$id}", ['is_active' => true])->assertOk()->assertJsonPath('is_active', true);
         $this->getJson("/api/registers?branch_id={$branch->id}")
             ->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $id)->assertJsonPath('0.code', 'C2');
-        $this->assertDatabaseHas('cash_register_user', ['cash_register_id' => $id, 'user_id' => $cashier->id]);
+        $this->postJson('/api/registers', [...$payload, 'code' => 'C3', 'user_ids' => []])
+            ->assertUnprocessable()->assertJsonValidationErrors('user_ids');
+        $this->putJson("/api/registers/{$id}", ['user_ids' => []])
+            ->assertUnprocessable()->assertJsonValidationErrors('user_ids');
+    }
+
+    public function test_removing_register_assignments_requires_the_legacy_table_to_be_empty(): void
+    {
+        $this->assertFalse(Schema::hasTable('cash_register_user'));
+        Schema::create('cash_register_user', function (Blueprint $table) {
+            $table->unsignedBigInteger('cash_register_id');
+            $table->unsignedBigInteger('user_id');
+        });
+        DB::table('cash_register_user')->insert(['cash_register_id' => 1, 'user_id' => 1]);
+        $migration = require database_path('migrations/2026_11_21_140000_remove_cash_register_user.php');
+
+        try {
+            $migration->up();
+            $this->fail('La migración debe proteger las asignaciones existentes.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('contiene asignaciones', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('cash_register_user', 1);
+        DB::table('cash_register_user')->delete();
+        $migration->up();
+        $this->assertFalse(Schema::hasTable('cash_register_user'));
+        $migration->up();
+        $this->assertFalse(Schema::hasTable('cash_register_user'));
     }
 
     public function test_branch_updates_preserve_user_assignments(): void
@@ -264,7 +303,6 @@ class PhaseOneApiTest extends TestCase
         $branch->users()->attach([$user->id, $peer->id]);
         $register = CashRegister::create(['branch_id' => $branch->id, 'name' => 'Caja', 'code' => 'C1']);
         $other = CashRegister::create(['branch_id' => $branch->id, 'name' => 'Otra', 'code' => 'C2']);
-        $register->users()->attach($user);
         $account = Account::create(['branch_id' => $branch->id, 'name' => 'Banco', 'type' => 'banco']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/branches')->assertJsonCount(1);

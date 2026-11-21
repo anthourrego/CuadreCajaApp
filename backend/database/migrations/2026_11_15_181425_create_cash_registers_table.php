@@ -18,17 +18,10 @@ return new class extends Migration
             $table->unique(['branch_id', 'code']);
         });
 
-        Schema::create('cash_register_user', function (Blueprint $table) {
-            $table->foreignId('cash_register_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
-            $table->primary(['cash_register_id', 'user_id']);
-        });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('cash_register_user');
         Schema::dropIfExists('cash_registers');
     }
 };

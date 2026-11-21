@@ -229,7 +229,6 @@ class UserManagementTest extends TestCase
         $user = User::factory()->create(['role_id' => $role->id, 'default_branch_id' => $branch->id]);
         $user->branches()->attach([$branch->id, $other->id]);
         $visible = CashRegister::create(['branch_id' => $other->id, 'name' => 'Asignada', 'code' => 'A1']);
-        $visible->users()->attach($user);
         $unassigned = CashRegister::create(['branch_id' => $branch->id, 'name' => 'No asignada', 'code' => 'A1']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/user')
@@ -242,7 +241,6 @@ class UserManagementTest extends TestCase
         $this->getJson('/api/user')->assertOk()->assertJsonPath('default_branch', null);
         $branch->update(['is_active' => true]);
         $user->branches()->detach($branch);
-        $user->cashRegisters()->detach($visible);
         $this->getJson('/api/user')->assertOk()->assertJsonPath('default_branch', null);
         $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $visible->id);
         $this->getJson("/api/registers/{$unassigned->id}")->assertForbidden();

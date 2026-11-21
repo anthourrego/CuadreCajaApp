@@ -24,6 +24,9 @@ class Access
         'accounts.update' => 'Editar cuentas',
         'registers.create' => 'Crear cajas',
         'registers.update' => 'Editar cajas',
+        'reconciliations.view' => 'Consultar cuadres',
+        'reconciliations.create' => 'Registrar cuadres',
+        'reconciliations.update' => 'Editar cuadres',
     ];
 
     public const RETIRED_REGISTER_PERMISSIONS = ['registers.view_all', 'registers.view_assigned'];

@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\CashRegisterController;
+use App\Http\Controllers\Api\CashReconciliationController;
 use App\Http\Controllers\Api\ExpenseTypeController;
 use App\Http\Controllers\Api\LocationController;
 use App\Http\Controllers\Api\RoleController;
@@ -27,6 +28,9 @@ Route::middleware(['auth:sanctum', EnsureUserIsActive::class])->group(function (
     Route::apiResource('expense-types', ExpenseTypeController::class)
         ->parameters(['expense-types' => 'expenseType'])
         ->only(['index', 'store', 'update']);
+    Route::get('/reconciliations/availability', [CashReconciliationController::class, 'availability']);
+    Route::apiResource('reconciliations', CashReconciliationController::class)
+        ->only(['index', 'store', 'show', 'update']);
 
     Route::apiResource('branches', BranchController::class)->only(['index', 'store', 'show', 'update']);
     Route::apiResource('accounts', AccountController::class)->only(['index', 'store', 'show', 'update']);

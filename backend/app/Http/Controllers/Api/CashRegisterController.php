@@ -18,7 +18,7 @@ class CashRegisterController extends Controller
         $registers = CashRegister::query()
             ->whereIn('branch_id', Access::assignedBranchIds($user))
             ->when($request->integer('branch_id'), fn ($query, $branchId) => $query->where('branch_id', $branchId))
-            ->with('branch:id,name,code', 'users:id,name,email')
+            ->with('branch:id,name,code')
             ->orderBy('name')
             ->get();
 
@@ -49,18 +49,16 @@ class CashRegisterController extends Controller
                 Rule::unique('cash_registers', 'code')->where('branch_id', $request->input('branch_id')),
             ],
             'is_active' => ['sometimes', 'boolean'],
-            'user_ids' => ['sometimes', 'array'],
-            'user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
-        ], ['branch_id.exists' => 'La sucursal no existe o está inactiva.']);
+            'user_ids' => ['missing'],
+        ], [
+            'branch_id.exists' => 'La sucursal no existe o está inactiva.',
+            'user_ids.missing' => 'Asigna usuarios desde la administración de usuarios.',
+        ]);
         abort_unless(Access::branch($request->user(), 'registers.create', $data['branch_id']), 403);
 
-        $userIds = $data['user_ids'] ?? [];
-        unset($data['user_ids']);
-
         $register = CashRegister::create($data);
-        $register->users()->sync($userIds);
 
-        return response()->json($register->load('branch:id,name,code', 'users:id,name,email'), 201);
+        return response()->json($register->load('branch:id,name,code'), 201);
     }
 
     public function show(Request $request, CashRegister $cashRegister): JsonResponse
@@ -68,7 +66,7 @@ class CashRegisterController extends Controller
         $user = $request->user();
         abort_unless(in_array($cashRegister->branch_id, Access::assignedBranchIds($user)), 403, 'No tienes acceso a esta caja.');
 
-        return response()->json($cashRegister->load('branch:id,name,code', 'users:id,name,email'));
+        return response()->json($cashRegister->load('branch:id,name,code'));
     }
 
     public function update(Request $request, CashRegister $cashRegister): JsonResponse
@@ -92,20 +90,17 @@ class CashRegisterController extends Controller
                     ->ignore($cashRegister->id),
             ],
             'is_active' => ['sometimes', 'boolean'],
-            'user_ids' => ['sometimes', 'array'],
-            'user_ids.*' => ['integer', 'distinct', 'exists:users,id'],
-        ], ['branch_id.exists' => 'La sucursal no existe o está inactiva.']);
+            'user_ids' => ['missing'],
+        ], [
+            'branch_id.exists' => 'La sucursal no existe o está inactiva.',
+            'user_ids.missing' => 'Asigna usuarios desde la administración de usuarios.',
+        ]);
         if (isset($data['branch_id'])) {
             abort_unless(Access::branch($request->user(), 'registers.update', $data['branch_id']), 403);
         }
 
-        if (array_key_exists('user_ids', $data)) {
-            $cashRegister->users()->sync($data['user_ids']);
-            unset($data['user_ids']);
-        }
-
         $cashRegister->update($data);
 
-        return response()->json($cashRegister->load('branch:id,name,code', 'users:id,name,email'));
+        return response()->json($cashRegister->load('branch:id,name,code'));
     }
 }

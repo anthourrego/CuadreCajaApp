@@ -60,7 +60,6 @@ class RoleManagementTest extends TestCase
         $account = Account::create(['branch_id' => $b->id, 'name' => 'Banco', 'type' => 'banco']);
         $assigned = CashRegister::create(['branch_id' => $b->id, 'name' => 'Asignada', 'code' => 'C1']);
         $unassigned = CashRegister::create(['branch_id' => $b->id, 'name' => 'Otra', 'code' => 'C2']);
-        $assigned->users()->attach($user);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/registers')->assertOk()->assertJsonCount(2);
         $this->getJson("/api/registers/{$unassigned->id}")->assertOk();

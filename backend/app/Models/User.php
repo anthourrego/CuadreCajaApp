@@ -28,11 +28,6 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class)->withTimestamps();
     }
 
-    public function cashRegisters(): BelongsToMany
-    {
-        return $this->belongsToMany(CashRegister::class)->withTimestamps();
-    }
-
     public function role(): BelongsTo
     {
         return $this->belongsTo(Role::class);

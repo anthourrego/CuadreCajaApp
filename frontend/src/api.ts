@@ -40,6 +40,7 @@ export async function request<T>(path: string, options: RequestInit = {}): Promi
   if (!response.ok) {
     if (response.status === 401) throw new ApiError(401, 'Usuario o contraseña incorrectos.')
     if (response.status === 403) throw new ApiError(403, 'No tienes permiso para realizar esta operación.')
+    if (response.status === 409) throw new ApiError(409, 'El cuadre fue modificado por otro usuario. Recarga antes de guardar.')
     if (response.status === 429) throw new ApiError(429, 'Demasiados intentos. Espera un momento e inténtalo de nuevo.')
     if (response.status === 422) {
       const body: unknown = await response.json().catch(() => null)
