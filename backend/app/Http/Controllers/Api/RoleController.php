@@ -99,7 +99,9 @@ class RoleController extends Controller
         return [
             'id' => $role->id,
             'name' => $role->name,
-            'permissions' => $role->permissions->pluck('name')->values(),
+            'permissions' => $role->permissions->pluck('name')
+                ->reject(fn (string $permission) => in_array($permission, Access::RETIRED_REGISTER_PERMISSIONS, true))
+                ->values(),
             'users_count' => User::where('role_id', $role->id)->count(),
         ];
     }

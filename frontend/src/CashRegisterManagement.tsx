@@ -21,7 +21,7 @@ type OptionsState =
   | { status: 'error'; message: string }
 type DefaultBranchState =
   | { status: 'loading' }
-  | { status: 'ready'; branch: BranchSummary | null }
+  | { status: 'ready'; branch: BranchSummary | null; branches: BranchSummary[] }
   | { status: 'error'; message: string }
 
 function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessionExpired }: {
@@ -46,8 +46,8 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
 
   useEffect(() => {
     let active = true
-    request<{ default_branch: BranchSummary | null }>('/user', { headers: { Authorization: `Bearer ${token}` } })
-      .then(({ default_branch }) => { if (active) setDefaultBranchState({ status: 'ready', branch: default_branch }) })
+    request<{ default_branch: BranchSummary | null; branches: BranchSummary[] }>('/user', { headers: { Authorization: `Bearer ${token}` } })
+      .then(({ default_branch, branches }) => { if (active) setDefaultBranchState({ status: 'ready', branch: default_branch, branches }) })
       .catch((err: unknown) => {
         if (!active) return
         if (err instanceof ApiError && err.status === 401) onSessionExpired()
@@ -148,10 +148,10 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
   const branches = Array.from(new Map([
     ...registers.map((register) => [register.branch.id, register.branch] as const),
     ...(canCreate && options.status === 'ready' ? options.data.map((branch) => [branch.id, branch] as const) : []),
-    ...(defaultBranch ? [[defaultBranch.id, defaultBranch] as const] : []),
+    ...(defaultBranchState.status === 'ready' ? defaultBranchState.branches.map((branch) => [branch.id, branch] as const) : []),
   ]).values()).sort((a, b) => a.name.localeCompare(b.name))
   const filterBranchId = filterOverride ?? (defaultBranch ? String(defaultBranch.id) : '')
-  const filtered = registers.filter((register) => !filterBranchId || String(register.branch_id) === filterBranchId)
+  const filtered = registers.filter((register) => filterBranchId === 'all' || String(register.branch_id) === filterBranchId)
   const hasActiveBranch = options.status === 'ready' && options.data.some((branch) => branch.is_active)
 
   return <div className="user-management">
@@ -169,12 +169,12 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
       <div className="user-form-actions"><button className="user-primary" disabled={busy || (editing === 'new' && !hasActiveBranch)} type="submit">{busy ? 'Guardando...' : 'Guardar caja'}</button><button className="user-secondary" disabled={busy} type="button" onClick={() => { setEditing(null); setError('') }}>Cancelar</button></div>
     </form> : <>
       <div className="user-toolbar">
-        <div className="user-field"><label htmlFor="register-filter-branch">Filtrar por sucursal</label><select id="register-filter-branch" disabled={defaultBranchState.status === 'loading'} value={filterBranchId} onChange={(event) => setFilterBranchId(event.target.value)}><option value="">Todas las sucursales disponibles</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}</select></div>
+        <div className="user-field"><label htmlFor="register-filter-branch">Filtrar por sucursal</label><select id="register-filter-branch" disabled={defaultBranchState.status !== 'ready'} value={filterBranchId} onChange={(event) => setFilterBranchId(event.target.value)}><option value="">Selecciona una sucursal</option><option value="all">Todas las sucursales disponibles</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}</select></div>
         {canCreate && <button className="user-primary" type="button" disabled={busy || !hasActiveBranch} onClick={() => openForm('new')}>+ Crear caja</button>}
       </div>
       {canCreate && options.status === 'loading' && <p className="workspace-message" role="status">Cargando sucursales...</p>}
       {canCreate && options.status === 'ready' && !hasActiveBranch && <p className="workspace-message">No tienes sucursales activas autorizadas para crear cajas.</p>}
-      {defaultBranchState.status === 'loading' ? <p className="workspace-message" role="status">Cargando filtro de sucursal...</p> : filtered.length === 0 ? <p className="workspace-message">No hay cajas disponibles para esta selección.</p> : <div className="record-list">{filtered.map((register) => <div className="record-row user-row" key={register.id}>
+      {defaultBranchState.status === 'loading' ? <p className="workspace-message" role="status">Cargando filtro de sucursal...</p> : defaultBranchState.status === 'error' ? null : !filterBranchId ? <p className="workspace-message">Selecciona una sucursal para consultar sus cajas.</p> : filtered.length === 0 ? <p className="workspace-message">No hay cajas disponibles para esta selección.</p> : <div className="record-list">{filtered.map((register) => <div className="record-row user-row" key={register.id}>
         <div className="record-symbol" aria-hidden="true">$</div>
         <div className="record-copy"><strong>{register.name}</strong><span>{register.code} · {register.branch.name}</span></div>
         <span className={`record-status ${register.is_active ? 'active' : 'inactive'}`}>{register.is_active ? 'Activa' : 'Inactiva'}</span>

@@ -49,7 +49,9 @@ class User extends Authenticatable
             return array_keys(Access::GLOBAL + Access::BRANCH);
         }
 
-        return $this->role->permissions->pluck('name')->unique()->values()->all();
+        return $this->role->permissions->pluck('name')->unique()
+            ->reject(fn (string $permission) => in_array($permission, Access::RETIRED_REGISTER_PERMISSIONS, true))
+            ->values()->all();
     }
 
     /**

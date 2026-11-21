@@ -230,12 +230,12 @@ class UserManagementTest extends TestCase
         $user->branches()->attach([$branch->id, $other->id]);
         $visible = CashRegister::create(['branch_id' => $other->id, 'name' => 'Asignada', 'code' => 'A1']);
         $visible->users()->attach($user);
-        CashRegister::create(['branch_id' => $branch->id, 'name' => 'No asignada', 'code' => 'A1']);
+        $unassigned = CashRegister::create(['branch_id' => $branch->id, 'name' => 'No asignada', 'code' => 'A1']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/user')
             ->assertOk()->assertJsonPath('default_branch.id', $branch->id)->assertJsonCount(2, 'branches');
-        $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $visible->id);
-        $this->getJson('/api/registers?branch_id='.$branch->id)->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/registers')->assertOk()->assertJsonCount(2);
+        $this->getJson('/api/registers?branch_id='.$branch->id)->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $unassigned->id);
         $this->getJson('/api/users/branch-options')->assertForbidden();
 
         $branch->update(['is_active' => false]);
@@ -244,13 +244,14 @@ class UserManagementTest extends TestCase
         $user->branches()->detach($branch);
         $user->cashRegisters()->detach($visible);
         $this->getJson('/api/user')->assertOk()->assertJsonPath('default_branch', null);
-        $this->getJson('/api/registers')->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $visible->id);
+        $this->getJson("/api/registers/{$unassigned->id}")->assertForbidden();
     }
 
     public function test_manager_can_only_assign_users_to_the_managers_own_branches(): void
     {
         $managerRole = Role::create(['name' => 'gestor', 'guard_name' => 'web']);
-        $managerRole->givePermissionTo(['users.manage', 'branches.view', 'registers.view_all']);
+        $managerRole->givePermissionTo(['users.manage', 'branches.view']);
         $manager = User::factory()->create(['role_id' => $managerRole->id]);
         $allowed = Branch::create(['name' => 'Centro', 'code' => 'CTR']);
         $outside = Branch::create(['name' => 'Norte', 'code' => 'NTE']);

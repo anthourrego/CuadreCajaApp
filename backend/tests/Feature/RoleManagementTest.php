@@ -8,6 +8,7 @@ use App\Models\CashRegister;
 use App\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -26,7 +27,7 @@ class RoleManagementTest extends TestCase
         $admin = User::factory()->create();
         $admin->update(['role_id' => Role::findByName('admin', 'web')->id]);
         $response = $this->actingAs($admin, 'sanctum')->postJson('/api/roles', [
-            'name' => 'encargado', 'permissions' => ['branches.view', 'registers.view_assigned'],
+            'name' => 'encargado', 'permissions' => ['branches.view'],
         ])->assertCreated()->assertJsonMissingPath('branch_ids');
         $this->postJson('/api/roles', [
             'name' => 'legacy', 'permissions' => [], 'branch_ids' => [],
@@ -52,7 +53,7 @@ class RoleManagementTest extends TestCase
     {
         $user = User::factory()->create();
         $other = Role::create(['name' => 'otro', 'guard_name' => 'web']);
-        $other->givePermissionTo(['branches.view', 'registers.view_assigned']);
+        $other->givePermissionTo('branches.view');
         $user->update(['role_id' => $other->id]);
         $b = Branch::create(['name' => 'B', 'code' => 'B']);
         $user->branches()->attach($b);
@@ -61,10 +62,10 @@ class RoleManagementTest extends TestCase
         $unassigned = CashRegister::create(['branch_id' => $b->id, 'name' => 'Otra', 'code' => 'C2']);
         $assigned->users()->attach($user);
 
-        $this->actingAs($user, 'sanctum')->getJson('/api/registers')->assertOk()->assertJsonCount(1)->assertJsonPath('0.id', $assigned->id);
-        $this->getJson("/api/registers/{$unassigned->id}")->assertForbidden();
+        $this->actingAs($user, 'sanctum')->getJson('/api/registers')->assertOk()->assertJsonCount(2);
+        $this->getJson("/api/registers/{$unassigned->id}")->assertOk();
         $this->getJson("/api/accounts/{$account->id}")->assertForbidden();
-        $this->getJson("/api/branches/{$b->id}")->assertOk()->assertJsonMissingPath('accounts')->assertJsonCount(1, 'cash_registers');
+        $this->getJson("/api/branches/{$b->id}")->assertOk()->assertJsonMissingPath('accounts')->assertJsonCount(2, 'cash_registers');
         $user->branches()->detach($b);
         $this->getJson("/api/registers/{$assigned->id}")->assertForbidden();
         $this->getJson("/api/branches/{$b->id}")->assertForbidden();
@@ -74,13 +75,13 @@ class RoleManagementTest extends TestCase
     {
         $actor = User::factory()->create();
         $manager = Role::create(['name' => 'gestor', 'guard_name' => 'web']);
-        $manager->givePermissionTo(['users.manage', 'roles.manage', 'branches.view', 'registers.view_assigned']);
+        $manager->givePermissionTo(['users.manage', 'roles.manage', 'branches.view']);
         $actor->update(['role_id' => $manager->id]);
         $a = Branch::create(['name' => 'A', 'code' => 'A']);
         $b = Branch::create(['name' => 'B', 'code' => 'B']);
         $actor->branches()->attach($a);
         $powerful = Role::create(['name' => 'potente', 'guard_name' => 'web']);
-        $powerful->givePermissionTo('registers.view_all');
+        $powerful->givePermissionTo('accounts.update');
         $target = User::factory()->create();
         $target->update(['role_id' => $powerful->id]);
         $target->branches()->attach($b);
@@ -88,7 +89,7 @@ class RoleManagementTest extends TestCase
         $admin->update(['role_id' => Role::findByName('admin', 'web')->id]);
 
         $this->actingAs($actor, 'sanctum')
-            ->postJson('/api/roles', ['name' => 'exceso', 'permissions' => ['registers.view_all']])->assertForbidden();
+            ->postJson('/api/roles', ['name' => 'exceso', 'permissions' => ['accounts.update']])->assertForbidden();
         $this->putJson("/api/roles/{$powerful->id}", ['name' => 'potente', 'permissions' => []])->assertForbidden();
         $this->putJson("/api/users/{$target->id}", ['password' => 'password-seguro-123', 'password_confirmation' => 'password-seguro-123'])->assertForbidden();
         $this->putJson("/api/users/{$actor->id}", ['role_id' => Role::findByName('admin', 'web')->id])->assertForbidden();
@@ -150,8 +151,28 @@ class RoleManagementTest extends TestCase
         $migration->up();
 
         $this->assertTrue($supervisor->fresh()->hasPermissionTo('accounts.view', 'web'));
-        $this->assertTrue($cashier->fresh()->hasPermissionTo('registers.view_assigned', 'web'));
-        $this->assertFalse($cashier->fresh()->hasPermissionTo('registers.view_all', 'web'));
+        $this->assertTrue($cashier->fresh()->hasPermissionTo('branches.view', 'web'));
+        $this->assertFalse($cashier->fresh()->hasPermissionTo('accounts.view', 'web'));
         $this->assertDatabaseCount('branch_user', 2);
+    }
+
+    public function test_retired_register_permissions_do_not_block_role_delegation_or_appear_in_options(): void
+    {
+        $legacy = Permission::findOrCreate('registers.view_assigned', 'web');
+        $manager = Role::create(['name' => 'gestor', 'guard_name' => 'web']);
+        $manager->givePermissionTo(['users.manage', 'roles.manage', 'branches.view']);
+        $targetRole = Role::create(['name' => 'operador', 'guard_name' => 'web']);
+        $targetRole->givePermissionTo(['branches.view', $legacy]);
+        $user = User::factory()->create(['role_id' => $manager->id]);
+        $target = User::factory()->create(['role_id' => $targetRole->id]);
+
+        $options = $this->actingAs($user, 'sanctum')->getJson('/api/roles/options')->assertOk()->json('branch');
+        $this->assertArrayNotHasKey('registers.view_assigned', $options);
+        $this->assertArrayNotHasKey('registers.view_all', $options);
+        $this->getJson('/api/roles')->assertOk()
+            ->assertJsonFragment(['id' => $targetRole->id, 'name' => 'operador', 'permissions' => ['branches.view']]);
+        $this->actingAs($target->fresh(), 'sanctum')->getJson('/api/user')
+            ->assertOk()->assertJsonMissing(['registers.view_assigned']);
+        $this->actingAs($user, 'sanctum')->putJson("/api/roles/{$targetRole->id}", ['name' => 'operador', 'permissions' => ['branches.view']])->assertOk();
     }
 }

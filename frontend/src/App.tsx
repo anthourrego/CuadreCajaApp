@@ -166,7 +166,7 @@ function App() {
                     <label htmlFor="username">Usuario</label>
                     <div className="input-wrap">
                       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
-                      <input id="username" type="text" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Ingresa tu usuario" maxLength={64} required value={username} onChange={(event) => setUsername(event.target.value)} />
+                      <input id="username" type="text" autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="Ingresa tu usuario" maxLength={64} required value={username} onChange={(event) => setUsername(event.target.value)} />
                     </div>
                   </div>
                   <div className="field">

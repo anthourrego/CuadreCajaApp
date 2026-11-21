@@ -127,7 +127,7 @@ class PhaseOneApiTest extends TestCase
         ]);
     }
 
-    public function test_cashiers_cannot_read_other_registers_or_branch_accounts(): void
+    public function test_cashiers_can_read_all_registers_in_assigned_branches_but_not_accounts(): void
     {
         $cashier = User::factory()->create();
         $cashier->update(['role_id' => Role::findByName('cajero', 'web')->id]);
@@ -153,18 +153,19 @@ class PhaseOneApiTest extends TestCase
         $this->actingAs($cashier, 'sanctum')
             ->getJson('/api/registers')
             ->assertOk()
-            ->assertJsonCount(1)
-            ->assertJsonPath('0.id', $assignedRegister->id);
+            ->assertJsonCount(2)
+            ->assertJsonFragment(['id' => $assignedRegister->id])
+            ->assertJsonFragment(['id' => $otherRegister->id]);
 
-        $this->getJson("/api/registers/{$otherRegister->id}")->assertForbidden();
+        $this->getJson("/api/registers/{$otherRegister->id}")->assertOk();
         $this->getJson('/api/accounts')->assertOk()->assertJsonCount(0);
         $this->getJson("/api/accounts/{$account->id}")->assertForbidden();
 
         $this->getJson("/api/branches/{$branch->id}")
             ->assertOk()
             ->assertJsonMissingPath('accounts')
-            ->assertJsonCount(1, 'cash_registers')
-            ->assertJsonMissing(['id' => $otherRegister->id]);
+            ->assertJsonCount(2, 'cash_registers')
+            ->assertJsonFragment(['id' => $otherRegister->id]);
     }
 
     public function test_register_options_and_edit_actions_follow_permissions_per_branch(): void
@@ -177,7 +178,7 @@ class PhaseOneApiTest extends TestCase
         $other = Branch::create(['name' => 'Norte', 'code' => 'NTE']);
         $user->branches()->attach([$allowed->id, $inactive->id]);
         $register = CashRegister::create(['branch_id' => $allowed->id, 'name' => 'Caja', 'code' => 'C1']);
-        CashRegister::create(['branch_id' => $other->id, 'name' => 'Otra caja', 'code' => 'C1']);
+        $otherRegister = CashRegister::create(['branch_id' => $other->id, 'name' => 'Otra caja', 'code' => 'C1']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/registers/options')
             ->assertOk()->assertJsonCount(2)
@@ -186,6 +187,8 @@ class PhaseOneApiTest extends TestCase
             ->assertJsonMissing(['id' => $other->id]);
         $this->getJson('/api/registers')->assertOk()->assertJsonCount(1)
             ->assertJsonPath('0.id', $register->id)->assertJsonPath('0.can_update', true);
+        $this->getJson("/api/registers/{$otherRegister->id}")->assertForbidden();
+        $this->getJson('/api/registers?branch_id='.$other->id)->assertOk()->assertJsonCount(0);
         $this->putJson("/api/registers/{$register->id}", ['name' => 'Caja editada'])
             ->assertOk()->assertJsonPath('name', 'Caja editada');
 
@@ -195,10 +198,10 @@ class PhaseOneApiTest extends TestCase
         $this->putJson("/api/registers/{$register->id}", ['is_active' => false])->assertForbidden();
 
         $role->givePermissionTo('registers.create');
-        $role->revokePermissionTo(['branches.view', 'registers.view_all']);
+        $role->revokePermissionTo('branches.view');
         $this->actingAs($user->fresh(), 'sanctum')->getJson('/api/registers/options')
             ->assertOk()->assertJsonCount(2);
-        $this->getJson('/api/registers')->assertOk()->assertJsonCount(0);
+        $this->getJson('/api/registers')->assertOk()->assertJsonCount(1);
     }
 
     public function test_register_management_preserves_branch_and_assignments_and_filters_by_branch(): void
@@ -265,10 +268,10 @@ class PhaseOneApiTest extends TestCase
         $account = Account::create(['branch_id' => $branch->id, 'name' => 'Banco', 'type' => 'banco']);
 
         $this->actingAs($user, 'sanctum')->getJson('/api/branches')->assertJsonCount(1);
-        $this->getJson('/api/registers')->assertJsonCount(1)->assertJsonPath('0.id', $register->id);
-        $this->getJson("/api/registers/{$other->id}")->assertForbidden();
+        $this->getJson('/api/registers')->assertJsonCount(2);
+        $this->getJson("/api/registers/{$other->id}")->assertOk();
         $this->getJson("/api/accounts/{$account->id}")->assertForbidden();
-        $this->getJson("/api/branches/{$branch->id}")->assertJsonMissingPath('accounts')->assertJsonCount(1, 'cash_registers');
+        $this->getJson("/api/branches/{$branch->id}")->assertJsonMissingPath('accounts')->assertJsonCount(2, 'cash_registers');
         $this->actingAs($peer, 'sanctum')->getJson('/api/branches')->assertJsonCount(1);
 
         $branch->users()->detach($user);

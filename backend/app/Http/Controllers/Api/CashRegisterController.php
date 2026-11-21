@@ -15,14 +15,8 @@ class CashRegisterController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $supervisorBranches = Access::branchIds($user, 'registers.view_all');
-        $cashierBranches = Access::branchIds($user, 'registers.view_assigned');
         $registers = CashRegister::query()
-            ->where(
-                fn ($query) => $query->whereIn('branch_id', $supervisorBranches)
-                    ->orWhere(fn ($query) => $query->whereIn('branch_id', $cashierBranches)
-                        ->whereHas('users', fn ($users) => $users->whereKey($user->id))),
-            )
+            ->whereIn('branch_id', Access::assignedBranchIds($user))
             ->when($request->integer('branch_id'), fn ($query, $branchId) => $query->where('branch_id', $branchId))
             ->with('branch:id,name,code', 'users:id,name,email')
             ->orderBy('name')
@@ -72,13 +66,7 @@ class CashRegisterController extends Controller
     public function show(Request $request, CashRegister $cashRegister): JsonResponse
     {
         $user = $request->user();
-        abort_unless(
-            Access::branch($user, 'registers.view_all', $cashRegister->branch_id)
-                || (Access::branch($user, 'registers.view_assigned', $cashRegister->branch_id)
-                    && $cashRegister->users()->whereKey($user->id)->exists()),
-            403,
-            'No tienes acceso a esta caja.',
-        );
+        abort_unless(in_array($cashRegister->branch_id, Access::assignedBranchIds($user)), 403, 'No tienes acceso a esta caja.');
 
         return response()->json($cashRegister->load('branch:id,name,code', 'users:id,name,email'));
     }

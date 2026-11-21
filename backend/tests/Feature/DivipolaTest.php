@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Models\Branch;
+use App\Models\CashRegister;
 use App\Models\User;
 use Database\Seeders\AdminUserSeeder;
 use Database\Seeders\BranchSeeder;
+use Database\Seeders\CashRegisterSeeder;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DivipolaSeeder;
 use Database\Seeders\RoleSeeder;
@@ -23,15 +25,52 @@ class DivipolaTest extends TestCase
         $this->seed(DatabaseSeeder::class);
         $branch = Branch::where('code', '001')->firstOrFail();
         $admin = User::where('username', 'admin')->firstOrFail();
+        $register = CashRegister::where('branch_id', $branch->id)->where('code', '001')->firstOrFail();
 
         $this->assertDatabaseCount('branches', 1);
         $this->assertDatabaseHas('branches', ['name' => 'Sucursal principal', 'code' => '001']);
+        $this->assertDatabaseCount('cash_registers', 1);
+        $this->assertDatabaseHas('cash_registers', ['id' => $register->id, 'name' => 'Caja principal', 'is_active' => true]);
+        $this->assertDatabaseCount('cash_register_user', 0);
         $this->assertDatabaseHas('branch_user', ['branch_id' => $branch->id, 'user_id' => $admin->id]);
         $this->assertSame($branch->id, $admin->default_branch_id);
         $this->assertSame('admin', $admin->role->name);
         $this->assertSame('admin@cuadrecaja.test', $admin->email);
         $this->actingAs($admin, 'sanctum')->getJson('/api/user')
             ->assertOk()->assertJsonPath('default_branch.id', $branch->id);
+        $this->getJson('/api/registers')->assertOk()->assertJsonPath('0.id', $register->id);
+    }
+
+    public function test_initial_cash_register_seeder_preserves_existing_changes_and_assignments(): void
+    {
+        $this->seed([BranchSeeder::class, CashRegisterSeeder::class]);
+        $branch = Branch::where('code', '001')->firstOrFail();
+        $register = $branch->cashRegisters()->where('code', '001')->firstOrFail();
+        $user = User::factory()->create();
+        $register->update(['name' => 'Caja editada', 'is_active' => false]);
+        $register->users()->attach($user);
+        $branch->update(['is_active' => false]);
+
+        $this->seed(CashRegisterSeeder::class);
+
+        $this->assertDatabaseCount('cash_registers', 1);
+        $this->assertDatabaseHas('cash_registers', ['id' => $register->id, 'branch_id' => $branch->id, 'code' => '001', 'name' => 'Caja editada', 'is_active' => false]);
+        $this->assertDatabaseHas('cash_register_user', ['cash_register_id' => $register->id, 'user_id' => $user->id]);
+    }
+
+    public function test_initial_cash_register_is_not_created_for_an_inactive_branch(): void
+    {
+        $this->seed(BranchSeeder::class);
+        Branch::where('code', '001')->update(['is_active' => false]);
+
+        try {
+            $this->seed(CashRegisterSeeder::class);
+            $this->fail('Se esperaba un error al crear una caja en una sucursal inactiva.');
+        } catch (\LogicException $exception) {
+            $this->assertStringContainsString('sucursal principal está inactiva', $exception->getMessage());
+        }
+
+        $this->assertDatabaseCount('cash_registers', 0);
     }
 
     public function test_default_admin_seeder_is_idempotent_and_does_not_replace_the_password(): void

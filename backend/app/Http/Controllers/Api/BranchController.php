@@ -66,12 +66,7 @@ class BranchController extends Controller
         if (Access::branch($user, 'accounts.view', $branch->id)) {
             $branch->load('accounts');
         }
-        if (Access::branch($user, 'registers.view_all', $branch->id)) {
-            $branch->load('cashRegisters');
-        } elseif (Access::branch($user, 'registers.view_assigned', $branch->id)) {
-            $branch->setRelation('cashRegisters', $branch->cashRegisters()
-                ->whereHas('users', fn ($query) => $query->whereKey($user->id))->get());
-        }
+        $branch->load('cashRegisters');
 
         return response()->json($branch);
     }

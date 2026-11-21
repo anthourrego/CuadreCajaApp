@@ -118,19 +118,17 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const can = (permission: string) => user.permissions.includes(permission)
   const canViewBranches = can('branches.view') || can('branches.create')
-  const canViewRegisters = can('registers.view_all') || can('registers.view_assigned') || can('registers.create')
   const canViewAccounts = accountsSectionEnabled && can('accounts.view')
   const canManageUsers = can('users.manage')
   const canManageRoles = can('roles.manage')
   const canManageLocations = can('locations.manage')
   const [refreshError, setRefreshError] = useState('')
   const branches = useResource<Branch>('/branches', token, canViewBranches, onSessionExpired)
-  const registers = useResource<Register>('/registers', token, canViewRegisters, onSessionExpired)
+  const registers = useResource<Register>('/registers', token, true, onSessionExpired)
   const accounts = useResource<Account>('/accounts', token, canViewAccounts, onSessionExpired)
   const users = useResource<User>('/users', token, canManageUsers, onSessionExpired)
   const roles = useResource<Role>('/roles', token, canManageUsers || canManageRoles, onSessionExpired)
-  const sections: Section[] = ['inicio']
-  if (canViewRegisters) sections.push('cajas')
+  const sections: Section[] = ['inicio', 'cajas']
   if (canViewAccounts) sections.push('cuentas')
 
   function refreshAfterRoleChange() {
@@ -230,7 +228,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
 
   const summaries = [
     ...(canViewBranches ? [{ section: 'sucursales' as const, description: 'Puntos del negocio', resource: branches.resource }] : []),
-    ...(canViewRegisters ? [{ section: 'cajas' as const, description: 'Cajas registradas', resource: registers.resource }] : []),
+    { section: 'cajas' as const, description: 'Cajas registradas', resource: registers.resource },
     ...(canViewAccounts ? [{ section: 'cuentas' as const, description: 'Medios y fondos', resource: accounts.resource }] : []),
     ...(canManageUsers ? [{ section: 'usuarios' as const, description: 'Personas con acceso', resource: users.resource }] : []),
   ]
@@ -361,7 +359,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
                 {section === 'sucursales' && (branches.resource.status === 'ready'
                   ? <BranchManagement token={token} branches={branches.resource.data} canCreate={can('branches.create')} onSaved={branches.reload} onSessionExpired={onSessionExpired} />
                   : <ResourceView<Branch> resource={branches.resource} reload={branches.reload} empty="No hay sucursales disponibles para tu usuario." render={(branch) => <RecordRow key={branch.id} title={branch.name} detail={[branch.code, branch.municipality?.name, branch.municipality?.department.name, branch.address].filter(Boolean).join(' · ')} status={branch.is_active} /> } />)}
-                {section === 'cajas' && canViewRegisters && (registers.resource.status === 'ready'
+                {section === 'cajas' && (registers.resource.status === 'ready'
                   ? <CashRegisterManagement token={token} registers={registers.resource.data} canCreate={can('registers.create')} onSaved={registers.reload} onSessionExpired={onSessionExpired} />
                   : <ResourceView resource={registers.resource} reload={registers.reload} empty="No hay cajas disponibles para tu usuario." render={() => null} />)}
                 {section === 'cuentas' && canViewAccounts && <ResourceView resource={accounts.resource} reload={accounts.reload} empty="No hay cuentas disponibles para tu usuario." render={(account) => <RecordRow key={account.id} title={account.name} detail={`${accountTypes[account.type] ?? account.type} · ${account.branch.name}`} status={account.is_active} />} />}

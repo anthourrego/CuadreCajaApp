@@ -21,15 +21,15 @@ class Access
         'accounts.view' => 'Consultar cuentas',
         'accounts.create' => 'Crear cuentas',
         'accounts.update' => 'Editar cuentas',
-        'registers.view_all' => 'Consultar todas las cajas',
-        'registers.view_assigned' => 'Consultar cajas asignadas',
         'registers.create' => 'Crear cajas',
         'registers.update' => 'Editar cajas',
     ];
 
+    public const RETIRED_REGISTER_PERMISSIONS = ['registers.view_all', 'registers.view_assigned'];
+
     public const DEFAULTS = [
-        'supervisor' => ['branches.view', 'accounts.view', 'registers.view_all'],
-        'cajero' => ['branches.view', 'registers.view_assigned'],
+        'supervisor' => ['branches.view', 'accounts.view'],
+        'cajero' => ['branches.view'],
     ];
 
     public static function allows(User $user, string $permission): bool
@@ -73,7 +73,7 @@ class Access
             return false;
         }
 
-        return self::canGrant($actor, $role->permissions->pluck('name')->all());
+        return self::canGrant($actor, array_diff($role->permissions->pluck('name')->all(), self::RETIRED_REGISTER_PERMISSIONS));
     }
 
     public static function canGrant(User $actor, array $permissions): bool
