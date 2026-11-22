@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
+import EmptyState from './EmptyState'
+import { useSessionFilter } from './useSessionFilter'
 import './UserManagement.css'
 import './BranchManagement.css'
 
@@ -36,7 +38,7 @@ function BranchManagement({ token, branches, canCreate, onSaved, onSessionExpire
   const [departments, setDepartments] = useState<LocationState>({ status: 'loading' })
   const [municipalities, setMunicipalities] = useState<LocationState>({ status: 'loading' })
   const [retry, setRetry] = useState(0)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useSessionFilter('branches.search', '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -166,7 +168,7 @@ function BranchManagement({ token, branches, canCreate, onSaved, onSessionExpire
       {notice && <p className="user-notice" role="status">{notice}</p>}
       {error && <p className="user-error" role="alert">{error}</p>}
       {editing ? (
-        <form className="user-form" onSubmit={submit}>
+        <form className="user-form" aria-busy={busy} onSubmit={submit}>
           <div className="user-form-heading"><h2>{editing === 'new' ? 'Crear sucursal' : 'Editar sucursal'}</h2><p>La ubicación es opcional. El acceso se configura desde los roles.</p></div>
           <div className="user-fields">
             <div className="user-field"><label htmlFor="branch-name">Nombre</label><input id="branch-name" required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} /></div>
@@ -180,7 +182,14 @@ function BranchManagement({ token, branches, canCreate, onSaved, onSessionExpire
       ) : (
         <>
           <div className="user-toolbar branch-toolbar"><div className="user-field"><label htmlFor="branch-search">Buscar por nombre, código o municipio</label><input id="branch-search" value={search} onChange={(event) => setSearch(event.target.value)} /></div>{canCreate && <button className="user-primary" type="button" disabled={busy} onClick={() => openForm('new')}>+ Crear sucursal</button>}</div>
-          {filtered.length === 0 ? <p className="workspace-message">{branches.length === 0 ? 'No hay sucursales registradas.' : 'No se encontraron sucursales.'}</p> : <div className="record-list">{filtered.map((branch) => <div className="record-row user-row" key={branch.id}><div className="record-symbol" aria-hidden="true">▦</div><div className="record-copy"><strong>{branch.name}</strong><span>{[branch.code, branch.municipality?.name, branch.municipality?.department.name, branch.address].filter(Boolean).join(' · ')}</span></div><span className={`record-status ${branch.is_active ? 'active' : 'inactive'}`}>{branch.is_active ? 'Activa' : 'Inactiva'}</span>{branch.can_update && <div className="user-row-actions"><button type="button" disabled={busy} aria-label={`Editar ${branch.name}`} onClick={() => openForm(branch)}>Editar</button><button type="button" disabled={busy} aria-label={`${branch.is_active ? 'Desactivar' : 'Reactivar'} ${branch.name}`} onClick={() => toggle(branch)}>{branch.is_active ? 'Desactivar' : 'Reactivar'}</button></div>}</div>)}</div>}
+          {filtered.length === 0 ? <EmptyState
+            title={branches.length === 0 ? 'Aún no hay sucursales' : 'No encontramos resultados'}
+            description={branches.length === 0 ? 'Crea una sucursal para organizar las cajas y operaciones de tu negocio.' : 'Prueba con otro nombre, código o municipio.'}
+            actionLabel={branches.length === 0 && canCreate ? '+ Crear sucursal' : undefined}
+            onAction={branches.length === 0 && canCreate ? () => openForm('new') : undefined}
+            secondaryLabel={branches.length > 0 && search ? 'Limpiar búsqueda' : undefined}
+            onSecondaryAction={branches.length > 0 && search ? () => setSearch('') : undefined}
+          /> : <div className="record-list">{filtered.map((branch) => <div className="record-row user-row" key={branch.id}><div className="record-symbol" aria-hidden="true">▦</div><div className="record-copy"><strong>{branch.name}</strong><span>{[branch.code, branch.municipality?.name, branch.municipality?.department.name, branch.address].filter(Boolean).join(' · ')}</span></div><span className={`record-status ${branch.is_active ? 'active' : 'inactive'}`}>{branch.is_active ? 'Activa' : 'Inactiva'}</span>{branch.can_update && <div className="user-row-actions"><button type="button" disabled={busy} aria-label={`Editar ${branch.name}`} onClick={() => openForm(branch)}>Editar</button><button type="button" disabled={busy} aria-label={`${branch.is_active ? 'Desactivar' : 'Reactivar'} ${branch.name}`} onClick={() => toggle(branch)}>{branch.is_active ? 'Desactivar' : 'Reactivar'}</button></div>}</div>)}</div>}
         </>
       )}
     </div>

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
 import type { BranchSummary, User } from './api'
+import EmptyState from './EmptyState'
 import './UserManagement.css'
 import './BranchManagement.css'
 
@@ -167,7 +168,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
       {notice && <p className="user-notice" role="status">{notice}</p>}
       {error && <p className="user-error" role="alert">{error}</p>}
       {editing ? (
-        <form className="user-form" onSubmit={handleSubmit}>
+        <form className="user-form" aria-busy={busy} onSubmit={handleSubmit}>
           <div className="user-form-heading"><div><h2>{editing === 'new' ? 'Crear usuario' : 'Editar usuario'}</h2><p>Completa la información y asigna un rol de acceso.</p></div></div>
           <div className="user-fields">
             <div className="user-field"><label htmlFor="user-name">Nombre completo</label><input id="user-name" required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} /></div>
@@ -193,7 +194,7 @@ function UserManagement({ token, currentUser, users, availableRoles, onSaved, on
       ) : (
         <>
           <div className="user-toolbar"><p>Administra el acceso y el rol de tus usuarios.</p><button className="user-primary" type="button" disabled={busy} onClick={() => openForm('new')}>+ Crear usuario</button></div>
-          {users.length === 0 ? <p className="workspace-message">No hay usuarios registrados.</p> : (
+          {users.length === 0 ? <EmptyState title="Aún no hay usuarios" description="Crea cuentas para dar acceso a tu equipo y asigna a cada persona el rol adecuado." actionLabel="+ Crear usuario" onAction={() => openForm('new')} /> : (
             <div className="record-list">
               {users.map((item) => (
                 <div className="record-row user-row" key={item.id}>

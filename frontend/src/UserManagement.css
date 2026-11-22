@@ -18,10 +18,29 @@
 .user-field input, .user-field select { @apply w-full min-h-11 rounded-control border border-solid border-field-border bg-white px-3 py-2.5 text-app-text; }
 .user-field input[readonly] { @apply bg-field-readonly text-field-readonly-text; }
 .user-field small { @apply mt-1.5 block text-[#75859a]; font-size: 11px; line-height: 1.4; }
+.user-field > label:has(+ :required) { display: flex; align-items: center; gap: 8px; }
+.user-field > label:has(+ :required)::after { content: 'Obligatorio'; margin-left: auto; color: #78889f; font-size: 10px; font-weight: 500; }
+.user-field input:focus-visible, .user-field select:focus-visible { outline-color: #245cbb; }
+.user-field input:user-invalid, .user-field select:user-invalid { border-color: #c4454d; }
 .user-form-actions { @apply mt-[22px] flex gap-2.5; }
+.user-form[aria-busy="true"] .user-primary[type="submit"]::before { width: 13px; height: 13px; margin-right: 8px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; content: ''; display: inline-block; vertical-align: -2px; animation: user-form-spin .7s linear infinite; }
+@keyframes user-form-spin { to { transform: rotate(360deg); } }
+.user-primary, .user-secondary, .user-row-actions button { transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease, background-color .16s ease; }
+.user-primary:hover:not(:disabled), .user-secondary:hover:not(:disabled), .user-row-actions button:hover:not(:disabled) { transform: translateY(-1px); }
+.user-primary:active:not(:disabled), .user-secondary:active:not(:disabled), .user-row-actions button:active:not(:disabled) { transform: translateY(0); }
 .user-error, .user-notice { @apply mt-[18px] mr-6 mb-0 ml-6 rounded-control p-3 text-control; line-height: 1.5; }
 .user-error { @apply bg-[#fff1f1] text-[#a42b32]; }
 .user-notice { @apply bg-[#e8f6ee] text-[#257750]; }
+.empty-state { @apply flex flex-col items-center px-6 py-10 text-center; }
+.empty-state-icon { @apply grid h-12 w-12 place-items-center rounded-[50%] bg-[#edf3fc] text-[24px] text-brand-blue; }
+.empty-state h3 { @apply mt-4 mb-1 text-[16px] text-app-text; }
+.empty-state p { @apply m-0 max-w-[390px] text-control text-[#78889f]; line-height: 1.6; }
+.empty-state-actions { @apply mt-5 flex flex-wrap justify-center gap-2; }
+.empty-state-actions button { min-height: 40px; }
+@media (prefers-reduced-motion: reduce) {
+  .user-form[aria-busy="true"] .user-primary[type="submit"]::before { animation-duration: 1.5s; }
+  .user-primary, .user-secondary, .user-row-actions button { transition: none; }
+}
 @media (max-width: 760px) {
   .user-toolbar { @apply flex-col items-start px-4 py-[18px]; }
   .user-form { @apply px-4 py-5; }

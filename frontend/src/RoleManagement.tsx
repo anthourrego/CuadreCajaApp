@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
+import EmptyState from './EmptyState'
 import './UserManagement.css'
 import './BranchManagement.css'
 
@@ -147,7 +148,7 @@ function RoleManagement({ token, roles, availablePermissions, onSaved, onSession
     {notice && <p className="user-notice" role="status">{notice}</p>}
     {error && <p className="user-error" role="alert">{error}</p>}
     {!options ? error ? <button className="user-secondary" type="button" onClick={() => { setError(''); setRetry((value) => value + 1) }}>Reintentar carga de opciones</button> : <p className="workspace-message" role="status">Cargando opciones...</p> : editing ? (
-      <form className="user-form" onSubmit={submit}>
+      <form className="user-form" aria-busy={busy} onSubmit={submit}>
         <div className="user-form-heading"><h2>{editing === 'new' ? 'Crear rol' : 'Editar rol'}</h2><p>Los roles definen permisos; el acceso a sucursales se asigna a cada usuario. Solo puedes delegar permisos dentro de tu alcance.</p></div>
         <div className="user-fields"><div className="user-field"><label htmlFor="role-name">Nombre del rol</label><input id="role-name" required minLength={3} maxLength={100} pattern={'[a-z0-9._\\-]+'} readOnly={editing !== 'new' && ['supervisor', 'cajero'].includes(editing.name)} value={name} onChange={(event) => setName(event.target.value)} /><small>Letras minúsculas, números, puntos, guiones y guiones bajos.</small></div></div>
         {permissionTree(options)}
@@ -155,7 +156,7 @@ function RoleManagement({ token, roles, availablePermissions, onSaved, onSession
       </form>
     ) : <>
       <div className="user-toolbar"><p>Configura los permisos de cada rol.</p><button className="user-primary" disabled={busy} type="button" onClick={() => openForm('new')}>+ Crear rol</button></div>
-      {roles.length === 0 ? <p className="workspace-message">No hay roles disponibles.</p> : <div className="record-list">{roles.map((role) => <div className="record-row user-row" key={role.id}><div className="record-symbol" aria-hidden="true">♙</div><div className="record-copy"><strong>{role.name}</strong><span>{role.name === 'admin' ? 'Acceso global protegido' : `${role.permissions.length} permisos · ${role.users_count} usuarios`}</span></div>{role.name !== 'admin' && <div className="user-row-actions"><button type="button" disabled={busy} onClick={() => openForm(role)}>Editar</button><button type="button" disabled={busy || role.users_count > 0} title={role.users_count > 0 ? 'Quita primero las asignaciones de usuarios' : 'Eliminar rol'} onClick={() => remove(role)}>Eliminar</button></div>}</div>)}</div>}
+      {roles.length === 0 ? <EmptyState title="Aún no hay roles personalizados" description="Crea un rol para definir los permisos que tendrá cada grupo de usuarios." actionLabel="+ Crear rol" onAction={() => openForm('new')} /> : <div className="record-list">{roles.map((role) => <div className="record-row user-row" key={role.id}><div className="record-symbol" aria-hidden="true">♙</div><div className="record-copy"><strong>{role.name}</strong><span>{role.name === 'admin' ? 'Acceso global protegido' : `${role.permissions.length} permisos · ${role.users_count} usuarios`}</span></div>{role.name !== 'admin' && <div className="user-row-actions"><button type="button" disabled={busy} onClick={() => openForm(role)}>Editar</button><button type="button" disabled={busy || role.users_count > 0} title={role.users_count > 0 ? 'Quita primero las asignaciones de usuarios' : 'Eliminar rol'} onClick={() => remove(role)}>{role.users_count > 0 ? 'En uso' : 'Eliminar'}</button></div>}</div>)}</div>}
     </>}
   </div>
 }

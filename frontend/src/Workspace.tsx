@@ -13,6 +13,7 @@ import RoleManagement from './RoleManagement'
 import type { Role } from './RoleManagement'
 import CashRegisterManagement from './CashRegisterManagement'
 import type { Register } from './CashRegisterManagement'
+import EmptyState from './EmptyState'
 import './Workspace.css'
 
 type Account = { id: number; name: string; type: string; is_active: boolean; branch: { name: string } }
@@ -104,7 +105,7 @@ function ResourceView<T>({ resource, reload, empty, render }: {
   if (resource.status === 'error') {
     return <div className="resource-error" role="alert"><p>{resource.message}</p><button type="button" onClick={reload}>Reintentar</button></div>
   }
-  if (resource.data.length === 0) return <p className="workspace-message">{empty}</p>
+  if (resource.data.length === 0) return <EmptyState title={empty} description="Cuando haya información disponible, aparecerá aquí." />
   return <div className="record-list">{resource.data.map(render)}</div>
 }
 
@@ -166,6 +167,25 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const [refreshError, setRefreshError] = useState('')
+  const [apiVersion, setApiVersion] = useState<{ status: 'loading' } | { status: 'ready'; version: string } | { status: 'error'; message: string }>({ status: 'loading' })
+
+  useEffect(() => {
+    let active = true
+    request<unknown>('/version', { headers: { Authorization: `Bearer ${token}` } })
+      .then((result) => {
+        if (!result || typeof result !== 'object' || !('version' in result) || typeof result.version !== 'string') {
+          throw new Error('El servidor devolvió una versión inválida.')
+        }
+        if (active) setApiVersion({ status: 'ready', version: result.version })
+      })
+      .catch((error: unknown) => {
+        if (!active) return
+        if (error instanceof ApiError && error.status === 401) onSessionExpired()
+        else setApiVersion({ status: 'error', message: error instanceof Error ? error.message : 'No se pudo consultar la versión de la API.' })
+      })
+    return () => { active = false }
+  }, [token, onSessionExpired])
+
   const branches = useResource<Branch>('/branches', token, canViewBranches, onSessionExpired)
   const registers = useResource<Register>('/registers', token, true, onSessionExpired)
   const accounts = useResource<Account>('/accounts', token, canViewAccounts, onSessionExpired)
@@ -443,7 +463,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
             </>
           )}
         </main>
-        <footer className="workspace-footer">CuadreCaja <span>·</span> Un espacio para tu negocio</footer>
+        <footer className="workspace-footer"><span>CuadreCaja · Un espacio para tu negocio</span><span className="workspace-version" aria-live="polite" title={apiVersion.status === 'error' ? apiVersion.message : undefined}>v{__APP_VERSION__} · API {apiVersion.status === 'ready' ? `v${apiVersion.version}` : apiVersion.status === 'error' ? 'no disponible' : '…'}</span></footer>
       </div>
       {profileMode && <ProfileManagement key={profileMode} mode={profileMode} user={user} token={token} onClose={closeProfile} onUserUpdated={(updated) => { onUserUpdated(updated); if (canManageUsers) users.reload(); setProfileNotice('Perfil actualizado correctamente.') }} onSessionExpired={onSessionExpired} onPasswordChanged={onPasswordChanged} />}
     </div>

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
 import type { User } from './api'
+import { clearSessionFilters } from './useSessionFilter'
 import illustration from './assets/contabilidad.png'
 import Workspace from './Workspace'
 import './App.css'
@@ -22,6 +23,7 @@ function App() {
 
   const expireSession = useCallback(() => {
     sessionStorage.removeItem(tokenKey)
+    clearSessionFilters()
     setToken(null)
     setUser(null)
     setError('Tu sesión ha expirado. Inicia sesión nuevamente.')
@@ -29,6 +31,7 @@ function App() {
 
   const passwordChanged = useCallback(() => {
     sessionStorage.removeItem(tokenKey)
+    clearSessionFilters()
     setToken(null)
     setUser(null)
     setError('Contraseña actualizada. Inicia sesión nuevamente.')
@@ -101,6 +104,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` },
       })
       sessionStorage.removeItem(tokenKey)
+      clearSessionFilters()
       setToken(null)
       setUser(null)
     } catch (err) {
@@ -161,7 +165,7 @@ function App() {
                 <h2>Inicia sesión</h2>
                 <p className="card-description">Ingresa tus datos para acceder a tu espacio de trabajo.</p>
 
-                <form onSubmit={handleLogin}>
+                <form aria-busy={busy} onSubmit={handleLogin}>
                   <div className="field">
                     <label htmlFor="username">Usuario</label>
                     <div className="input-wrap">

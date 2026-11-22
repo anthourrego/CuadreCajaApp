@@ -21,13 +21,15 @@ Para evitar cambios globales durante la migración, se importan el tema y las ut
 
 Ejecuta `npm run build` en esta carpeta y publica el contenido de `dist` en la carpeta pública del sitio. La compilación utiliza `VITE_API_ORIGIN` de `.env.production` y envía las solicitudes a `https://apicaudrecaja.gomariwms.com/api`. La URL se incorpora al compilar: si se cambia, hay que volver a compilar. No incluyas secretos en variables `VITE_`, ya que son públicas.
 
+La versión del producto sigue SemVer. El frontend toma su versión de `frontend/package.json`; la API usa `APP_VERSION` (por defecto `0.1.0`) en `backend/.env` y la entrega en `GET /api/version` a usuarios autenticados. Ambas se muestran en el pie de página; mantenlas alineadas al publicar y etiqueta el repositorio completo como `vX.Y.Z` (por ejemplo, `v0.1.0`).
+
 Como el frontend y la API están en dominios distintos, el backend debe permitir mediante CORS el origen HTTPS donde se publique el frontend. Si se usa un proxy bajo el mismo origen, `VITE_API_ORIGIN` puede dejarse vacío para utilizar rutas relativas `/api`.
 
 La sesión utiliza un token de Sanctum en `sessionStorage`: persiste al recargar la misma pestaña, pero no al cerrarla. Cerrar sesión desde la aplicación también revoca el token en el servidor. Mantén el sitio protegido frente a XSS y no utilices esta configuración como sustituto de una auditoría de seguridad.
 
 Tras iniciar sesión se muestran las secciones disponibles según los permisos del usuario. En Configuración > Usuarios se pueden crear, editar, desactivar y reactivar cuentas y asignar un único rol delegable a cada usuario. Desactivar un usuario revoca sus sesiones; cambiar su contraseña también.
 
-Cada módulo utiliza una ruta con fragmento, por ejemplo `#/cuadres` o `#/usuarios`, que se conserva al recargar y admite los botones Atrás y Adelante del navegador sin configuración adicional del servidor. Las rutas desconocidas o no disponibles muestran un aviso y la pantalla de inicio; el acceso sigue sujeto a los permisos del usuario. Los formularios y filtros no se conservan al recargar.
+Cada módulo utiliza una ruta con fragmento, por ejemplo `#/cuadres` o `#/usuarios`, que se conserva al recargar y admite los botones Atrás y Adelante del navegador sin configuración adicional del servidor. Las rutas desconocidas o no disponibles muestran un aviso y la pantalla de inicio; el acceso sigue sujeto a los permisos del usuario. Los filtros se conservan en la pestaña durante la sesión, incluso al cambiar de módulo o recargar; al cerrar sesión se eliminan. Los formularios no se conservan al recargar.
 
 La sección Cuentas está oculta temporalmente en el frontend mediante `accountsSectionEnabled` en `Workspace.tsx`; la API y sus permisos no cambian.
 

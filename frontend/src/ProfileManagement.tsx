@@ -69,7 +69,7 @@ function ProfileManagement({ mode, user, token, onUserUpdated, onSessionExpired,
       if (!busy) onClose()
     }
   }}>
-    <form className="user-form" onSubmit={submit}>
+    <form className="user-form" aria-busy={busy} onSubmit={submit}>
     <div className="user-form-heading"><h2 id="profile-dialog-title">{mode === 'perfil' ? 'Editar perfil' : 'Cambiar contraseña'}</h2><p>{mode === 'perfil' ? 'Actualiza tus datos personales.' : 'Al cambiar tu contraseña se cerrarán todas tus sesiones.'}</p></div>
     {error && <p className="user-error" role="alert">{error}</p>}
     <div className="user-fields">

@@ -60,6 +60,20 @@ class PhaseOneApiTest extends TestCase
             ->assertJsonPath('id', $user->id);
     }
 
+    public function test_api_version_is_available_only_to_authenticated_users(): void
+    {
+        config(['app.version' => '0.1.0']);
+
+        $this->getJson('/api/version')->assertUnauthorized();
+
+        $user = User::factory()->create();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/version')
+            ->assertOk()
+            ->assertExactJson(['version' => '0.1.0']);
+    }
+
     public function test_invalid_login_is_rejected(): void
     {
         $user = User::factory()->create(['password' => 'correct-password']);

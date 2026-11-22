@@ -110,8 +110,8 @@
 .resource-error { @apply p-6 text-control text-[#a42b32]; line-height: 1.5; }
 .resource-error p { @apply mt-0 mr-0 mb-3 ml-0; }
 .resource-error button { @apply rounded-[7px] border border-solid border-[#e2b9bc] bg-white px-3 py-2 font-bold text-[#a42b32]; }
-.workspace-footer { padding: 20px 5%; border-top: 1px solid #e8edf5; color: #9ca9ba; font-size: 11px; }
-.workspace-footer span { margin: 0 4px; color: #e3b448; }
+.workspace-footer { display: flex; justify-content: space-between; gap: 12px; padding: 20px 5%; border-top: 1px solid #e8edf5; color: #9ca9ba; font-size: 11px; }
+.workspace-footer .workspace-version { color: #78889f; font-variant-numeric: tabular-nums; }
 @media (max-width: 760px) {
   .workspace-sidebar { @apply invisible fixed inset-y-0 left-0 z-[31] h-dvh w-[min(290px,85vw)] overflow-y-auto px-[18px] py-6; transform: translateX(-100%); transition: transform .24s ease; box-shadow: 12px 0 35px rgba(9, 22, 46, .22); }
   .mobile-menu-open .workspace-sidebar { visibility: visible; transform: translateX(0); }

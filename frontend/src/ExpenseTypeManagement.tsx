@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
+import EmptyState from './EmptyState'
 import './UserManagement.css'
 
 type ExpenseType = { id: number; name: string; is_active: boolean }
@@ -123,7 +124,7 @@ function ExpenseTypeManagement({ token, onSessionExpired }: { token: string; onS
     {notice && <p className="user-notice" role="status">{notice}</p>}
     {error && !editing && <p className="user-error" role="alert">{error}</p>}
     <div className="user-toolbar"><p>Estos tipos están disponibles para todas las sucursales.</p><button className="user-primary" type="button" disabled={busy || types.status !== 'ready'} onClick={(event) => openForm('new', event.currentTarget)}>+ Crear tipo de gasto</button></div>
-    {types.status === 'loading' ? <p className="workspace-message" role="status">Cargando tipos de gasto...</p> : types.status === 'error' ? <div className="resource-error" role="alert"><p>{types.message}</p><button type="button" onClick={reload}>Reintentar</button></div> : types.data.length === 0 ? <p className="workspace-message">No hay tipos de gasto registrados.</p> : <div className="record-list">{types.data.map((item) => <div className="record-row user-row" key={item.id}>
+    {types.status === 'loading' ? <p className="workspace-message" role="status">Cargando tipos de gasto...</p> : types.status === 'error' ? <div className="resource-error" role="alert"><p>{types.message}</p><button type="button" onClick={reload}>Reintentar</button></div> : types.data.length === 0 ? <EmptyState title="Aún no hay tipos de gasto" description="Agrega categorías para clasificar los gastos de los cuadres." actionLabel="+ Crear tipo de gasto" onAction={(event) => openForm('new', event.currentTarget)} /> : <div className="record-list">{types.data.map((item) => <div className="record-row user-row" key={item.id}>
       <div className="record-symbol" aria-hidden="true">$</div>
       <div className="record-copy"><strong>{item.name}</strong></div>
       <span className={`record-status ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'Activo' : 'Inactivo'}</span>
@@ -136,7 +137,7 @@ function ExpenseTypeManagement({ token, onSessionExpired }: { token: string; onS
         if (!busy) closeForm()
       }
     }}>
-      <form className="user-form" onSubmit={submit}>
+      <form className="user-form" aria-busy={busy} onSubmit={submit}>
         <div className="user-form-heading"><h2 id="expense-type-title">{editing === 'new' ? 'Crear tipo de gasto' : 'Editar tipo de gasto'}</h2><p>El catálogo es compartido por todas las sucursales.</p></div>
         {error && <p className="user-error" role="alert">{error}</p>}
         <div className="user-fields"><div className="user-field"><label htmlFor="expense-type-name">Nombre</label><input id="expense-type-name" autoFocus required maxLength={255} value={name} onChange={(event) => setName(event.target.value)} /></div></div>

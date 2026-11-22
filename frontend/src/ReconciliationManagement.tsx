@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { ApiError, request } from './api'
 import type { BranchSummary } from './api'
 import type { Register } from './CashRegisterManagement'
+import EmptyState from './EmptyState'
+import { useSessionFilter } from './useSessionFilter'
 import './UserManagement.css'
 import './ReconciliationManagement.css'
 
@@ -134,8 +136,10 @@ function ReconciliationManagement({ token, registers, canView, canCreate, onSess
   const [types, setTypes] = useState<Resource<ExpenseType[]>>({ status: 'loading' })
   const [records, setRecords] = useState<Resource<Reconciliation[]>>({ status: 'loading' })
   const [reloadVersion, setReloadVersion] = useState(0)
-  const [filter, setFilter] = useState<string | null>(null)
-  const [dateFilter, setDateFilter] = useState(colombiaDate)
+  const [storedFilter, setStoredFilter] = useSessionFilter('reconciliations.branch', '')
+  const filter = storedFilter || null
+  const setFilter = (value: string | null) => setStoredFilter(value ?? '')
+  const [dateFilter, setDateFilter] = useSessionFilter('reconciliations.date', colombiaDate())
   const [today, setToday] = useState(colombiaDate)
   const [editing, setEditing] = useState<Reconciliation | 'new' | null>(null)
   const [branchId, setBranchId] = useState('')
@@ -353,7 +357,7 @@ function ReconciliationManagement({ token, registers, canView, canCreate, onSess
     {error && <p className="user-error" role="alert">{error}</p>}
     {profile.status === 'error' && <div className="resource-error" role="alert"><p>{profile.message}</p><button type="button" onClick={() => setReloadVersion((value) => value + 1)}>Reintentar</button></div>}
     {types.status === 'error' && <div className="resource-error" role="alert"><p>{types.message}</p><button type="button" onClick={() => setReloadVersion((value) => value + 1)}>Reintentar</button></div>}
-    {editing ? <form className="user-form" onSubmit={submit}>
+    {editing ? <form className="user-form" aria-busy={busy} onSubmit={submit}>
       <div className="user-form-heading"><h2>{editing === 'new' ? 'Registrar cuadre' : 'Editar cuadre'}</h2><p>Un cuadre por caja y fecha. La venta es el valor informado por la registradora.</p></div>
       <div className="user-fields">
         <div className="user-field"><label className="reconciliation-field-label" htmlFor="reconciliation-branch"><FormIcon name="branch" />Sucursal</label>{editing !== 'new'
@@ -411,7 +415,14 @@ function ReconciliationManagement({ token, registers, canView, canCreate, onSess
         {canView && <div className="user-field"><label htmlFor="reconciliation-filter-date">Fecha</label><input id="reconciliation-filter-date" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div>}
         {canCreate && <button className="user-primary" type="button" disabled={busy || types.status !== 'ready' || profile.status !== 'ready'} onClick={() => openForm('new')}>+ Registrar cuadre</button>}
       </div>
-      {!canView ? <p className="workspace-message">No tienes permiso para consultar cuadres guardados.</p> : profile.status === 'loading' || records.status === 'loading' ? <p className="workspace-message" role="status">Cargando cuadres...</p> : records.status === 'error' ? <div className="resource-error" role="alert"><p>{records.message}</p><button type="button" onClick={() => setReloadVersion((value) => value + 1)}>Reintentar</button></div> : profile.status === 'error' ? null : !selectedFilter ? <p className="workspace-message">Selecciona una sucursal para consultar sus cuadres.</p> : visible.length === 0 ? <p className="workspace-message">No hay cuadres para esta selección.</p> : <div className="record-list">{visible.map((record) => {
+      {!canView ? <p className="workspace-message">No tienes permiso para consultar cuadres guardados.</p> : profile.status === 'loading' || records.status === 'loading' ? <p className="workspace-message" role="status">Cargando cuadres...</p> : records.status === 'error' ? <div className="resource-error" role="alert"><p>{records.message}</p><button type="button" onClick={() => setReloadVersion((value) => value + 1)}>Reintentar</button></div> : profile.status === 'error' ? null : !selectedFilter ? <EmptyState title="Selecciona una sucursal" description="Elige una sucursal para consultar sus cuadres guardados." /> : visible.length === 0 ? <EmptyState
+        title={records.status === 'ready' && records.data.length === 0 ? 'Aún no hay cuadres registrados' : 'No encontramos cuadres con estos filtros'}
+        description={records.status === 'ready' && records.data.length === 0 ? 'Los cuadres que registres aparecerán aquí.' : 'Prueba con otra sucursal o fecha, o limpia los filtros para ver todos los resultados.'}
+        actionLabel={records.status === 'ready' && records.data.length === 0 && canCreate ? '+ Registrar cuadre' : undefined}
+        onAction={records.status === 'ready' && records.data.length === 0 && canCreate ? () => openForm('new') : undefined}
+        secondaryLabel={records.status === 'ready' && records.data.length > 0 ? 'Limpiar filtros' : undefined}
+        onSecondaryAction={records.status === 'ready' && records.data.length > 0 ? () => { setFilter('all'); setDateFilter('') } : undefined}
+      /> : <div className="record-list">{visible.map((record) => {
         const result = cents(record.difference.startsWith('-') ? record.difference.slice(1) : record.difference)
         const signed = result === null ? null : record.difference.startsWith('-') ? -result : result
         const amounts = `Venta ${formatAmount(record.sales)} · Efectivo ${formatAmount(record.cash)} · Banco ${formatAmount(record.bank)} · QR ${formatAmount(record.qr)} · Gastos ${formatAmount(record.expenses_total)}`

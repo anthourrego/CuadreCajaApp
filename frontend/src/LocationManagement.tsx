@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
+import EmptyState from './EmptyState'
+import { useSessionFilter } from './useSessionFilter'
 import './UserManagement.css'
 import './LocationManagement.css'
 
@@ -12,16 +14,18 @@ type Tab = 'departments' | 'municipalities'
 type LoadState<T> = { status: 'loading' } | { status: 'ready'; data: T[] } | { status: 'error'; message: string }
 
 function LocationManagement({ token, onSessionExpired }: { token: string; onSessionExpired: () => void }) {
-  const [tab, setTab] = useState<Tab>('departments')
+  const [storedTab, setStoredTab] = useSessionFilter('locations.tab', 'departments')
+  const tab: Tab = storedTab === 'municipalities' ? 'municipalities' : 'departments'
+  const setTab = (value: Tab) => setStoredTab(value)
   const [departments, setDepartments] = useState<LoadState<Department>>({ status: 'loading' })
   const [municipalities, setMunicipalities] = useState<LoadState<Municipality>>({ status: 'loading' })
-  const [departmentCode, setDepartmentCode] = useState('')
+  const [departmentCode, setDepartmentCode] = useSessionFilter('locations.department', '')
   const [version, setVersion] = useState(0)
   const [editing, setEditing] = useState<Item | 'new' | null>(null)
   const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [type, setType] = useState('Municipio')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useSessionFilter('locations.search', '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -152,7 +156,7 @@ function LocationManagement({ token, onSessionExpired }: { token: string; onSess
       {notice && <p className="user-notice" role="status">{notice}</p>}
       {error && <p className="user-error" role="alert">{error}</p>}
       {editing ? (
-        <form className="user-form" onSubmit={submit}>
+        <form className="user-form" aria-busy={busy} onSubmit={submit}>
           <div className="user-form-heading"><h2>{editing === 'new' ? 'Crear' : 'Editar'} {tab === 'departments' ? 'departamento' : 'municipio'}</h2><p>{tab === 'municipalities' ? `Departamento: ${selectedDepartment?.name ?? departmentCode}` : 'Los códigos existentes no se pueden modificar.'}</p></div>
           <div className="user-fields">
             <div className="user-field"><label htmlFor="location-code">Código DIVIPOLA</label><input id="location-code" required inputMode="numeric" pattern={tab === 'departments' ? '[0-9]{2}' : '[0-9]{5}'} maxLength={tab === 'departments' ? 2 : 5} disabled={editing !== 'new'} value={code} onChange={(event) => setCode(event.target.value)} /><small>{tab === 'departments' ? 'Dos dígitos.' : `Cinco dígitos, comienza por ${departmentCode}.`}</small></div>
@@ -167,7 +171,14 @@ function LocationManagement({ token, onSessionExpired }: { token: string; onSess
           {departments.status === 'error' ? <div className="resource-error" role="alert"><p>{departments.message}</p><button type="button" onClick={reload}>Reintentar</button></div> : (
             <>
               <div className="user-toolbar location-toolbar"><div className="user-field"><label htmlFor="location-search">Buscar por nombre o código</label><input id="location-search" value={search} onChange={(event) => setSearch(event.target.value)} /></div><button className="user-primary" type="button" disabled={busy || departments.status !== 'ready' || (tab === 'municipalities' && !selectedDepartment?.is_active)} onClick={() => openForm('new')}>+ Crear {tab === 'departments' ? 'departamento' : 'municipio'}</button></div>
-              {tab === 'municipalities' && !departmentCode ? <p className="workspace-message">Selecciona un departamento para consultar sus municipios.</p> : list.status === 'loading' ? <p className="workspace-message" role="status">Cargando información...</p> : list.status === 'error' ? <div className="resource-error" role="alert"><p>{list.message}</p><button type="button" onClick={reload}>Reintentar</button></div> : items.length === 0 ? <p className="workspace-message">No se encontraron registros.</p> : <div className="record-list">{items.map((item) => <div className="record-row user-row" key={item.code}><div className="record-symbol" aria-hidden="true">⌖</div><div className="record-copy"><strong>{item.name}</strong><span>{item.code}{'type' in item ? ` · ${item.type}` : ''}</span></div><span className={`record-status ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'Activo' : 'Inactivo'}</span><div className="user-row-actions"><button type="button" disabled={busy} aria-label={`Editar ${item.name}`} onClick={() => openForm(item)}>Editar</button><button type="button" disabled={busy} aria-label={`${item.is_active ? 'Desactivar' : 'Reactivar'} ${item.name}`} onClick={() => toggle(item)}>{item.is_active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}</div>}
+              {tab === 'municipalities' && !departmentCode ? <EmptyState title="Selecciona un departamento" description="Elige un departamento para consultar sus municipios." /> : list.status === 'loading' ? <p className="workspace-message" role="status">Cargando información...</p> : list.status === 'error' ? <div className="resource-error" role="alert"><p>{list.message}</p><button type="button" onClick={reload}>Reintentar</button></div> : items.length === 0 ? <EmptyState
+                title={search ? 'No encontramos resultados' : `Aún no hay ${tab === 'departments' ? 'departamentos' : 'municipios'}`}
+                description={search ? 'Prueba con otro nombre o código.' : 'Puedes agregar el primer registro para completar el catálogo.'}
+                actionLabel={!search ? `+ Crear ${tab === 'departments' ? 'departamento' : 'municipio'}` : undefined}
+                onAction={!search ? () => openForm('new') : undefined}
+                secondaryLabel={search ? 'Limpiar búsqueda' : undefined}
+                onSecondaryAction={search ? () => setSearch('') : undefined}
+              /> : <div className="record-list">{items.map((item) => <div className="record-row user-row" key={item.code}><div className="record-symbol" aria-hidden="true">⌖</div><div className="record-copy"><strong>{item.name}</strong><span>{item.code}{'type' in item ? ` · ${item.type}` : ''}</span></div><span className={`record-status ${item.is_active ? 'active' : 'inactive'}`}>{item.is_active ? 'Activo' : 'Inactivo'}</span><div className="user-row-actions"><button type="button" disabled={busy} aria-label={`Editar ${item.name}`} onClick={() => openForm(item)}>Editar</button><button type="button" disabled={busy} aria-label={`${item.is_active ? 'Desactivar' : 'Reactivar'} ${item.name}`} onClick={() => toggle(item)}>{item.is_active ? 'Desactivar' : 'Reactivar'}</button></div></div>)}</div>}
             </>
           )}
         </>

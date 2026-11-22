@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import Swal from 'sweetalert2'
 import { ApiError, request } from './api'
 import type { BranchSummary } from './api'
+import EmptyState from './EmptyState'
+import { useSessionFilter } from './useSessionFilter'
 import './UserManagement.css'
 
 type BranchOption = BranchSummary & { is_active: boolean }
@@ -35,7 +37,9 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
   const [name, setName] = useState('')
   const [code, setCode] = useState('')
   const [branchId, setBranchId] = useState('')
-  const [filterOverride, setFilterBranchId] = useState<string | null>(null)
+  const [storedFilterOverride, setStoredFilterOverride] = useSessionFilter('registers.branch', '')
+  const filterOverride = storedFilterOverride || null
+  const setFilterBranchId = (value: string | null) => setStoredFilterOverride(value ?? '')
   const [defaultBranchState, setDefaultBranchState] = useState<DefaultBranchState>({ status: 'loading' })
   const [defaultBranchRetry, setDefaultBranchRetry] = useState(0)
   const [options, setOptions] = useState<OptionsState>({ status: 'loading' })
@@ -159,7 +163,7 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
     {error && <p className="user-error" role="alert">{error}</p>}
     {defaultBranchState.status === 'error' && <div className="resource-error" role="alert"><p>No se pudo cargar la sucursal por defecto. {defaultBranchState.message}</p><button type="button" onClick={() => { setDefaultBranchState({ status: 'loading' }); setDefaultBranchRetry((value) => value + 1) }}>Reintentar</button></div>}
     {canCreate && options.status === 'error' && <div className="resource-error" role="alert"><p>{options.message}</p><button type="button" onClick={() => { setOptions({ status: 'loading' }); setRetry((value) => value + 1) }}>Reintentar carga de sucursales</button></div>}
-    {editing ? <form className="user-form" onSubmit={submit}>
+    {editing ? <form className="user-form" aria-busy={busy} onSubmit={submit}>
       <div className="user-form-heading"><h2>{editing === 'new' ? 'Crear caja' : 'Editar caja'}</h2><p>Cada caja pertenece a una sucursal y tiene un código único dentro de ella.</p></div>
       <div className="user-fields">
         <div className="user-field"><label htmlFor="register-branch">Sucursal</label><select id="register-branch" required disabled={editing !== 'new' || options.status !== 'ready'} value={branchId} onChange={(event) => setBranchId(event.target.value)}><option value="" disabled>Selecciona una sucursal</option>{editing !== 'new' ? <option value={editing.branch_id}>{editing.branch.name} · {editing.branch.code}</option> : options.status === 'ready' && options.data.map((branch) => <option key={branch.id} value={branch.id} disabled={!branch.is_active}>{branch.name} · {branch.code}{!branch.is_active && ' (inactiva)'}</option>)}</select></div>
@@ -173,8 +177,15 @@ function CashRegisterManagement({ token, registers, canCreate, onSaved, onSessio
         {canCreate && <button className="user-primary" type="button" disabled={busy || !hasActiveBranch} onClick={() => openForm('new')}>+ Crear caja</button>}
       </div>
       {canCreate && options.status === 'loading' && <p className="workspace-message" role="status">Cargando sucursales...</p>}
-      {canCreate && options.status === 'ready' && !hasActiveBranch && <p className="workspace-message">No tienes sucursales activas autorizadas para crear cajas.</p>}
-      {defaultBranchState.status === 'loading' ? <p className="workspace-message" role="status">Cargando filtro de sucursal...</p> : defaultBranchState.status === 'error' ? null : !filterBranchId ? <p className="workspace-message">Selecciona una sucursal para consultar sus cajas.</p> : filtered.length === 0 ? <p className="workspace-message">No hay cajas disponibles para esta selección.</p> : <div className="record-list">{filtered.map((register) => <div className="record-row user-row" key={register.id}>
+      {canCreate && options.status === 'ready' && !hasActiveBranch && <EmptyState title="No hay sucursales activas disponibles" description="Necesitas una sucursal activa y autorizada para crear cajas." />}
+      {defaultBranchState.status === 'loading' ? <p className="workspace-message" role="status">Cargando filtro de sucursal...</p> : defaultBranchState.status === 'error' ? null : !filterBranchId ? <EmptyState title="Selecciona una sucursal" description="Elige una sucursal para consultar sus cajas." /> : filtered.length === 0 ? <EmptyState
+        title={registers.length === 0 ? 'Aún no hay cajas' : 'No hay cajas para esta selección'}
+        description={registers.length === 0 ? 'Crea una caja para empezar a registrar operaciones.' : 'Prueba otra sucursal o muestra todas las cajas disponibles.'}
+        actionLabel={registers.length === 0 && canCreate && hasActiveBranch ? '+ Crear caja' : undefined}
+        onAction={registers.length === 0 && canCreate && hasActiveBranch ? () => openForm('new') : undefined}
+        secondaryLabel={registers.length > 0 ? 'Ver todas las sucursales' : undefined}
+        onSecondaryAction={registers.length > 0 ? () => setFilterBranchId('all') : undefined}
+      /> : <div className="record-list">{filtered.map((register) => <div className="record-row user-row" key={register.id}>
         <div className="record-symbol" aria-hidden="true">$</div>
         <div className="record-copy"><strong>{register.name}</strong><span>{register.code} · {register.branch.name}</span></div>
         <span className={`record-status ${register.is_active ? 'active' : 'inactive'}`}>{register.is_active ? 'Activa' : 'Inactiva'}</span>
