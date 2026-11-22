@@ -325,7 +325,9 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
             <button ref={mobileMenuButtonRef} className="mobile-menu-button" type="button" aria-label="Abrir menú" aria-expanded={mobileMenuOpen} aria-controls="workspace-sidebar" onClick={() => setMobileMenuOpen(true)}>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
             </button>
-            <div className="header-title"><span className="header-overline">MI ESPACIO</span><strong>{labels[section]}</strong></div>
+            <div className="header-title">
+              {section === 'inicio' ? <strong>{labels[section]}</strong> : <h1 id="workspace-page-title">{labels[section]}</h1>}
+            </div>
           </div>
           <div className="header-actions">
             <div className="user-menu" ref={userMenuRef}>
@@ -341,7 +343,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
           </div>
         </header>
 
-        <main className="workspace-content">
+        <main className="workspace-content" aria-labelledby={section === 'inicio' ? undefined : 'workspace-page-title'}>
           {logoutError && <p className="error" role="alert">{logoutError}</p>}
           {refreshError && <p className="error" role="alert">{refreshError}</p>}
           {profileNotice && <p className="user-notice" role="status">{profileNotice}</p>}
@@ -367,7 +369,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
             </>
           ) : (
             <>
-              <div className="section-heading"><div><span className="workspace-kicker">{settingsSections.includes(section) ? 'CONFIGURACIÓN' : 'MI ORGANIZACIÓN'}</span><h1>{labels[section]}</h1><p>{section === 'usuarios' ? 'Gestiona los usuarios y su rol.' : section === 'roles' ? 'Administra los permisos de cada rol.' : section === 'ubicaciones' ? 'Administra los departamentos y municipios.' : section === 'sucursales' ? 'Consulta y administra tus sucursales según tus permisos.' : 'Consulta la información disponible para tu usuario.'}</p></div></div>
+              {(section === 'usuarios' || section === 'roles' || section === 'ubicaciones' || section === 'sucursales') && <p className="page-description">{section === 'usuarios' ? 'Gestiona los usuarios y su rol.' : section === 'roles' ? 'Administra los permisos de cada rol.' : section === 'ubicaciones' ? 'Administra los departamentos y municipios.' : 'Consulta y administra tus sucursales según tus permisos.'}</p>}
               <section className="records-panel" aria-label={`Listado de ${labels[section].toLowerCase()}`}>
                 <div className="records-heading"><h2>{section === 'ubicaciones' ? 'Ubicaciones' : `Listado de ${labels[section].toLowerCase()}`}</h2>{section === 'cuentas' && <span>Solo consulta</span>}</div>
                 {section === 'sucursales' && (branches.resource.status === 'ready'

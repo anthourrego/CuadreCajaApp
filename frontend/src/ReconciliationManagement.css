@@ -16,8 +16,23 @@
 .reconciliation-expense-error { margin: 8px 0; color: #a42b32; font-size: 13px; }
 .reconciliation-result { margin-top: 20px; padding: 12px 16px; border-radius: 8px; background: #f1f5fb; }
 .reconciliation-result p { margin: 5px 0; }
+.reconciliation-toolbar { align-items: flex-end; justify-content: flex-start; }
+.reconciliation-toolbar .user-field { flex: 1 1 180px; min-width: 0; max-width: 300px; }
+.reconciliation-toolbar .user-primary { min-height: 44px; margin-left: auto; }
+.reconciliation-mobile-amounts { display: none; }
 .reconciliation-management .record-copy details span { display: block; margin-top: 4px; }
 @media (max-width: 760px) {
+  .reconciliation-toolbar { align-items: stretch; gap: 12px; }
+  .reconciliation-toolbar .user-field { flex: none; width: 100%; max-width: none; }
+  .reconciliation-toolbar .user-primary { width: 100%; margin-left: 0; }
+  .reconciliation-management .record-list { padding: 12px; }
+  .reconciliation-management .reconciliation-record { padding: 14px; border: 1px solid #e8edf5; border-radius: 10px; }
+  .reconciliation-management .reconciliation-record + .reconciliation-record { margin-top: 10px; }
+  .reconciliation-record .reconciliation-record-amounts { display: none; }
+  .reconciliation-mobile-amounts { display: block; }
+  .reconciliation-record .user-row-actions { padding-left: 0; justify-content: flex-end; }
+  .reconciliation-record .user-row-actions button, .reconciliation-form-action, .reconciliation-management .user-form-actions button { min-height: 44px; }
+  .reconciliation-management .user-field input, .reconciliation-management .user-field select { min-width: 0; }
   .reconciliation-expense-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
   .reconciliation-expense-table, .reconciliation-expense-table tbody { display: block; }
   .reconciliation-expense-table thead, .reconciliation-expense-table colgroup { display: none; }
