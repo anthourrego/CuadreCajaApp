@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { ApiError, request } from './api'
 import type { User } from './api'
@@ -34,6 +34,26 @@ const labels: Record<Section, string> = {
   roles: 'Roles',
   'tipos-gasto': 'Tipos de gasto',
   cuadres: 'Cuadres',
+}
+
+function subscribeToRoute(onChange: () => void) {
+  window.addEventListener('hashchange', onChange)
+  return () => window.removeEventListener('hashchange', onChange)
+}
+
+function getRouteHash() {
+  return window.location.hash
+}
+
+function isSection(value: string): value is Section {
+  return Object.prototype.hasOwnProperty.call(labels, value)
+}
+
+function sectionFromHash(hash: string): Section | null {
+  if (hash === '' || hash === '#' || hash === '#/') return 'inicio'
+  if (!hash.startsWith('#/')) return null
+  const section = hash.slice(2)
+  return isSection(section) ? section : null
 }
 
 const accountTypes: Record<string, string> = {
@@ -108,18 +128,6 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   logoutBusy: boolean
   logoutError: string
 }) {
-  const [section, setSection] = useState<Section>('inicio')
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [settingsOpen, setSettingsOpen] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [profileMode, setProfileMode] = useState<'perfil' | 'contrasena' | null>(null)
-  const [profileNotice, setProfileNotice] = useState('')
-  const userMenuRef = useRef<HTMLDivElement>(null)
-  const userMenuButtonRef = useRef<HTMLButtonElement>(null)
-  const sidebarRef = useRef<HTMLElement>(null)
-  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
-  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const can = (permission: string) => user.permissions.includes(permission)
   const canViewBranches = can('branches.view') || can('branches.create')
   const canViewAccounts = accountsSectionEnabled && can('accounts.view')
@@ -129,6 +137,34 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   const canManageExpenseTypes = can('expenses.manage_types')
   const canViewReconciliations = can('reconciliations.view')
   const canCreateReconciliations = can('reconciliations.create')
+  const routeHash = useSyncExternalStore(subscribeToRoute, getRouteHash)
+  const requestedSection = sectionFromHash(routeHash)
+  const allowedSections: Record<Section, boolean> = {
+    inicio: true,
+    sucursales: canViewBranches,
+    cajas: true,
+    cuentas: canViewAccounts,
+    usuarios: canManageUsers,
+    ubicaciones: canManageLocations,
+    roles: canManageRoles,
+    'tipos-gasto': canManageExpenseTypes,
+    cuadres: canViewReconciliations || canCreateReconciliations,
+  }
+  const section = requestedSection && allowedSections[requestedSection] ? requestedSection : 'inicio'
+  const routeError = !requestedSection
+    ? 'La ruta solicitada no existe.'
+    : !allowedSections[requestedSection] ? 'Esta sección no está disponible o no tienes permiso para acceder.' : ''
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(() => settingsSections.includes(section))
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [profileMode, setProfileMode] = useState<'perfil' | 'contrasena' | null>(null)
+  const [profileNotice, setProfileNotice] = useState('')
+  const userMenuRef = useRef<HTMLDivElement>(null)
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null)
+  const mobileCloseButtonRef = useRef<HTMLButtonElement>(null)
   const [refreshError, setRefreshError] = useState('')
   const branches = useResource<Branch>('/branches', token, canViewBranches, onSessionExpired)
   const registers = useResource<Register>('/registers', token, true, onSessionExpired)
@@ -149,13 +185,18 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
     request<User>('/user', { headers: { Authorization: `Bearer ${token}` } })
       .then((updated) => {
         onUserUpdated(updated)
-        if (!updated.permissions.includes('roles.manage')) setSection('inicio')
       })
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 401) onSessionExpired()
         else setRefreshError(error instanceof Error ? error.message : 'No se pudieron actualizar tus permisos.')
       })
   }
+
+  useEffect(() => {
+    if (settingsSections.includes(section)) setSettingsOpen(true)
+    setMobileMenuOpen(false)
+    setUserMenuOpen(false)
+  }, [routeHash, section])
 
   useEffect(() => {
     if (!userMenuOpen) return
@@ -217,7 +258,8 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   }, [mobileMenuOpen])
 
   function navigate(item: Section) {
-    setSection(item)
+    const hash = `#/${item}`
+    if (window.location.hash !== hash) window.location.hash = hash
     if (settingsSections.includes(item)) setSettingsOpen(true)
     setMobileMenuOpen(false)
     setUserMenuOpen(false)
@@ -348,6 +390,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
         </header>
 
         <main className="workspace-content" aria-labelledby={section === 'inicio' ? undefined : 'workspace-page-title'}>
+          {routeError && <p className="error" role="alert">{routeError}</p>}
           {logoutError && <p className="error" role="alert">{logoutError}</p>}
           {refreshError && <p className="error" role="alert">{refreshError}</p>}
           {profileNotice && <p className="user-notice" role="status">{profileNotice}</p>}
@@ -384,7 +427,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
                   : <ResourceView resource={registers.resource} reload={registers.reload} empty="No hay cajas disponibles para tu usuario." render={() => null} />)}
                 {section === 'cuentas' && canViewAccounts && <ResourceView resource={accounts.resource} reload={accounts.reload} empty="No hay cuentas disponibles para tu usuario." render={(account) => <RecordRow key={account.id} title={account.name} detail={`${accountTypes[account.type] ?? account.type} · ${account.branch.name}`} status={account.is_active} />} />}
                 {section === 'usuarios' && canManageUsers && (users.resource.status === 'ready' && roles.resource.status === 'ready'
-                  ? <UserManagement token={token} currentUser={user} users={users.resource.data} availableRoles={roles.resource.data} onSaved={users.reload} onSessionExpired={onSessionExpired} onUserUpdated={(updated) => { if (!updated.permissions.includes('users.manage')) setSection('inicio'); onUserUpdated(updated); roles.reload(); branches.reload(); registers.reload(); accounts.reload() }} />
+                  ? <UserManagement token={token} currentUser={user} users={users.resource.data} availableRoles={roles.resource.data} onSaved={users.reload} onSessionExpired={onSessionExpired} onUserUpdated={(updated) => { onUserUpdated(updated); roles.reload(); branches.reload(); registers.reload(); accounts.reload() }} />
                   : roles.resource.status !== 'ready'
                     ? <ResourceView resource={roles.resource} reload={roles.reload} empty="No hay roles disponibles." render={() => null} />
                   : <ResourceView resource={users.resource} reload={users.reload} empty="No hay usuarios registrados." render={() => null} />)}

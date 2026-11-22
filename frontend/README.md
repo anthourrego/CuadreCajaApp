@@ -27,6 +27,8 @@ La sesión utiliza un token de Sanctum en `sessionStorage`: persiste al recargar
 
 Tras iniciar sesión se muestran las secciones disponibles según los permisos del usuario. En Configuración > Usuarios se pueden crear, editar, desactivar y reactivar cuentas y asignar un único rol delegable a cada usuario. Desactivar un usuario revoca sus sesiones; cambiar su contraseña también.
 
+Cada módulo utiliza una ruta con fragmento, por ejemplo `#/cuadres` o `#/usuarios`, que se conserva al recargar y admite los botones Atrás y Adelante del navegador sin configuración adicional del servidor. Las rutas desconocidas o no disponibles muestran un aviso y la pantalla de inicio; el acceso sigue sujeto a los permisos del usuario. Los formularios y filtros no se conservan al recargar.
+
 La sección Cuentas está oculta temporalmente en el frontend mediante `accountsSectionEnabled` en `Workspace.tsx`; la API y sus permisos no cambian.
 
 En el menú del usuario de la cabecera se puede editar el perfil, cambiar la contraseña o cerrar sesión. El nombre de usuario se define al crear la cuenta y no puede modificarse. Los formularios de perfil y contraseña se abren en ventanas modales que se pueden cancelar o cerrar con Escape. El cambio de contraseña exige la contraseña actual y cierra todas las sesiones.
