@@ -25,7 +25,8 @@ export class ApiError extends Error {
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`/api${path}`, {
+    const apiOrigin = (import.meta.env.VITE_API_ORIGIN || '').replace(/\/+$/, '')
+    response = await fetch(`${apiOrigin}/api${path}`, {
       ...options,
       headers: {
         Accept: 'application/json',

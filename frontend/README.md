@@ -6,8 +6,14 @@
 2. En esta carpeta, ejecuta `npm install` y `npm run dev` (`npm.cmd` en PowerShell si la política de ejecución bloquea `npm.ps1`).
 3. Abre la dirección que muestra Vite e inicia sesión con el nombre de usuario y la contraseña del usuario creado.
 
-Vite redirige las solicitudes `/api` al backend local. Para publicar la aplicación, configura el servidor web o proxy inverso para que `/api` llegue a Laravel bajo el mismo origen y utiliza HTTPS; el proxy de Vite solo se aplica en desarrollo.
+Vite redirige las solicitudes `/api` al backend local; este proxy solo se aplica en desarrollo.
 Si el backend local usa otro puerto, establece la variable de entorno `API_PROXY_TARGET` antes de iniciar Vite, por ejemplo `http://127.0.0.1:8001`.
+
+## Producción
+
+Ejecuta `npm run build` en esta carpeta y publica el contenido de `dist` en la carpeta pública del sitio. La compilación utiliza `VITE_API_ORIGIN` de `.env.production` y envía las solicitudes a `https://apicaudrecaja.gomariwms.com/api`. La URL se incorpora al compilar: si se cambia, hay que volver a compilar. No incluyas secretos en variables `VITE_`, ya que son públicas.
+
+Como el frontend y la API están en dominios distintos, el backend debe permitir mediante CORS el origen HTTPS donde se publique el frontend. Si se usa un proxy bajo el mismo origen, `VITE_API_ORIGIN` puede dejarse vacío para utilizar rutas relativas `/api`.
 
 La sesión utiliza un token de Sanctum en `sessionStorage`: persiste al recargar la misma pestaña, pero no al cerrarla. Cerrar sesión desde la aplicación también revoca el token en el servidor. Mantén el sitio protegido frente a XSS y no utilices esta configuración como sustituto de una auditoría de seguridad.
 
