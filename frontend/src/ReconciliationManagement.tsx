@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { DayPicker } from 'react-day-picker'
+import { es } from 'react-day-picker/locale/es'
+import 'react-day-picker/style.css'
+import { createPortal } from 'react-dom'
 import { ApiError, request } from './api'
 import type { BranchSummary } from './api'
 import type { Register } from './CashRegisterManagement'
@@ -127,6 +131,134 @@ function colombiaDate(): string {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
   const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
   return `${values.year}-${values.month}-${values.day}`
+}
+
+function dateFromValue(value: string): Date | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return undefined
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12)
+  return date.getFullYear() === Number(match[1]) && date.getMonth() === Number(match[2]) - 1 && date.getDate() === Number(match[3]) ? date : undefined
+}
+
+function dateToValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function formatDateValue(value: string): string {
+  const date = dateFromValue(value)
+  return date ? new Intl.DateTimeFormat('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }).format(date) : 'Selecciona una fecha'
+}
+
+function DatePicker({ id, value, onChange, maxDate, disabled = false, readOnly = false, required = false, onOpen }: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+  maxDate?: string
+  disabled?: boolean
+  readOnly?: boolean
+  required?: boolean
+  onOpen?: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const popoverRef = useRef<HTMLDivElement>(null)
+  const selected = dateFromValue(value)
+  const maximum = maxDate ? dateFromValue(maxDate) : undefined
+  const today = dateFromValue(colombiaDate())
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const positionPopover = () => {
+      const trigger = triggerRef.current
+      const popover = popoverRef.current
+      if (!trigger || !popover) return
+      const triggerRect = trigger.getBoundingClientRect()
+      const popoverRect = popover.getBoundingClientRect()
+      const gutter = 12
+      const gap = 8
+      const spaceBelow = window.innerHeight - triggerRect.bottom - gutter
+      const spaceAbove = triggerRect.top - gutter
+      const placeAbove = spaceBelow < popoverRect.height && spaceAbove > spaceBelow
+      const preferredTop = placeAbove ? triggerRect.top - popoverRect.height - gap : triggerRect.bottom + gap
+      const maxTop = Math.max(gutter, window.innerHeight - popoverRect.height - gutter)
+      const maxLeft = Math.max(gutter, window.innerWidth - popoverRect.width - gutter)
+      popover.style.top = `${Math.max(gutter, Math.min(preferredTop, maxTop))}px`
+      popover.style.left = `${Math.max(gutter, Math.min(triggerRect.left, maxLeft))}px`
+      popover.style.visibility = 'visible'
+    }
+    positionPopover()
+    window.addEventListener('resize', positionPopover)
+    window.addEventListener('scroll', positionPopover, true)
+    return () => {
+      window.removeEventListener('resize', positionPopover)
+      window.removeEventListener('scroll', positionPopover, true)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function handlePointerDown(event: PointerEvent) {
+      if (event.target instanceof Node && !pickerRef.current?.contains(event.target) && !popoverRef.current?.contains(event.target)) setOpen(false)
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [open])
+
+  function toggleCalendar() {
+    if (disabled || readOnly) return
+    if (!open) onOpen?.()
+    if (!open && popoverRef.current) popoverRef.current.style.visibility = 'hidden'
+    setOpen((current) => !current)
+  }
+
+  return <div className="reconciliation-date-picker" ref={pickerRef} data-required={required ? 'true' : undefined}>
+    <button
+      ref={triggerRef}
+      id={id}
+      type="button"
+      className={`reconciliation-date-trigger${readOnly ? ' is-readonly' : ''}`}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      aria-required={required || undefined}
+      disabled={disabled}
+      onClick={toggleCalendar}
+    >
+      <FormIcon name="date" />
+      <span>{formatDateValue(value)}</span>
+      <svg aria-hidden="true" viewBox="0 0 16 16" fill="none"><path d="m4 6 4 4 4-4" /></svg>
+    </button>
+    {open && createPortal(<div ref={popoverRef} className="reconciliation-date-popover" id={`${id}-calendar`} role="dialog" aria-label="Seleccionar fecha">
+      <DayPicker
+        mode="single"
+        selected={selected}
+        onSelect={(nextDate) => {
+          onChange(nextDate ? dateToValue(nextDate) : '')
+          setOpen(false)
+          triggerRef.current?.focus()
+        }}
+        locale={es}
+        weekStartsOn={1}
+        today={today}
+        defaultMonth={selected ?? maximum ?? today}
+        endMonth={maximum}
+        disabled={maximum ? { after: maximum } : undefined}
+        showOutsideDays
+        fixedWeeks
+        autoFocus
+      />
+    </div>, document.body)}
+  </div>
 }
 
 function ReconciliationManagement({ token, registers, canView, canCreate, onSessionExpired }: {
@@ -364,7 +496,7 @@ function ReconciliationManagement({ token, registers, canView, canCreate, onSess
           ? <input id="reconciliation-branch" value={`${editing.branch.name} · ${editing.branch.code}`} readOnly />
           : <select id="reconciliation-branch" required disabled={busy} value={branchId} onChange={(event) => { setError(''); setAvailability(null); setBranchId(event.target.value); setRegisterId('') }}><option value="">Selecciona una sucursal</option>{formBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}</select>}</div>
         <div className="user-field"><label className="reconciliation-field-label" htmlFor="reconciliation-register"><FormIcon name="register" />Caja</label><select id="reconciliation-register" required disabled={busy || editing !== 'new' || !branchId} value={registerId} onChange={(event) => { setError(''); setAvailability(null); setRegisterId(event.target.value) }}><option value="">Selecciona una caja</option>{editing !== 'new' ? <option value={editing.cash_register_id}>{editing.cash_register.name} · {editing.cash_register.code}</option> : availableRegisters.map((register) => <option key={register.id} value={register.id}>{register.name} · {register.code}</option>)}</select>{editing === 'new' && branchId && availableRegisters.length === 0 && <small>No hay cajas activas disponibles en esta sucursal.</small>}</div>
-        <div className="user-field"><label className="reconciliation-field-label" htmlFor="reconciliation-date"><FormIcon name="date" />Fecha</label><input id="reconciliation-date" type="date" required max={editing === 'new' ? today : undefined} readOnly={editing !== 'new'} disabled={busy} value={date} onFocus={() => setToday(colombiaDate())} onChange={(event) => { setError(''); setAvailability(null); setDate(event.target.value) }} /></div>
+        <div className="user-field"><label className="reconciliation-field-label" htmlFor="reconciliation-date"><FormIcon name="date" />Fecha</label><DatePicker id="reconciliation-date" value={date} required maxDate={editing === 'new' ? today : undefined} readOnly={editing !== 'new'} disabled={busy} onOpen={() => setToday(colombiaDate())} onChange={(value) => { setError(''); setAvailability(null); setDate(value) }} /></div>
       </div>
       {editing === 'new' && <div className="reconciliation-availability" aria-live="polite">
         {dateIsFuture ? <p role="alert">La fecha del cuadre no puede ser posterior a la fecha actual de Colombia.</p>
@@ -412,7 +544,7 @@ function ReconciliationManagement({ token, registers, canView, canCreate, onSess
     </form> : <>
       <div className="user-toolbar reconciliation-toolbar">
         {canView && <div className="user-field"><label htmlFor="reconciliation-filter">Sucursal</label><select id="reconciliation-filter" disabled={profile.status !== 'ready'} value={selectedFilter} onChange={(event) => setFilter(event.target.value)}><option value="">Selecciona una sucursal</option><option value="all">Todas las sucursales disponibles</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name} · {branch.code}</option>)}</select></div>}
-        {canView && <div className="user-field"><label htmlFor="reconciliation-filter-date">Fecha</label><input id="reconciliation-filter-date" type="date" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)} /></div>}
+        {canView && <div className="user-field"><label htmlFor="reconciliation-filter-date">Fecha</label><DatePicker id="reconciliation-filter-date" value={dateFilter} onChange={setDateFilter} /></div>}
         {canCreate && <button className="user-primary" type="button" disabled={busy || types.status !== 'ready' || profile.status !== 'ready'} onClick={() => openForm('new')}>+ Registrar cuadre</button>}
       </div>
       {!canView ? <p className="workspace-message">No tienes permiso para consultar cuadres guardados.</p> : profile.status === 'loading' || records.status === 'loading' ? <p className="workspace-message" role="status">Cargando cuadres...</p> : records.status === 'error' ? <div className="resource-error" role="alert"><p>{records.message}</p><button type="button" onClick={() => setReloadVersion((value) => value + 1)}>Reintentar</button></div> : profile.status === 'error' ? null : !selectedFilter ? <EmptyState title="Selecciona una sucursal" description="Elige una sucursal para consultar sus cuadres guardados." /> : visible.length === 0 ? <EmptyState

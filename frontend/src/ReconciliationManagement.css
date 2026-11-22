@@ -55,3 +55,31 @@
 .reconciliation-expense-heading h3 { @apply flex items-center gap-[7px]; }
 .reconciliation-expense-action, .reconciliation-form-action { @apply inline-flex items-center justify-center gap-1.5; }
 .reconciliation-expense-action .reconciliation-icon, .reconciliation-form-action .reconciliation-icon { @apply h-[15px] w-[15px]; }
+.reconciliation-date-picker { position: relative; min-width: 0; }
+.reconciliation-date-trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; color: #14213d; background: white; text-align: left; transition: border-color .16s ease, box-shadow .16s ease; }
+.reconciliation-date-trigger:hover:not(:disabled):not(.is-readonly) { border-color: #5279ad; }
+.reconciliation-date-trigger:focus-visible { outline: 3px solid #e8ab26; outline-offset: 3px; }
+.reconciliation-date-trigger .reconciliation-icon { color: #5279ad; }
+.reconciliation-date-trigger span { flex: 1; text-transform: capitalize; }
+.reconciliation-date-trigger > svg { width: 16px; height: 16px; flex: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.reconciliation-date-trigger.is-readonly { background: #f3f5f8; color: #53647f; cursor: default; }
+.user-field > label:has(+ .reconciliation-date-picker[data-required="true"])::after { content: 'Obligatorio'; margin-left: auto; color: #78889f; font-size: 10px; font-weight: 500; }
+.reconciliation-date-popover { position: fixed; z-index: 1000; visibility: hidden; width: min(320px, calc(100vw - 32px)); max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; padding: 12px; border: 1px solid #e1e8f1; border-radius: 13px; background: #fff; box-shadow: 0 16px 38px rgb(20 40 79 / 16%); animation: reconciliation-calendar-in .14s ease-out; }
+.reconciliation-date-popover .rdp-root { --rdp-accent-color: #1158b8; --rdp-accent-background-color: #edf3fc; --rdp-today-color: #1158b8; --rdp-day-width: 36px; --rdp-day-height: 38px; --rdp-day_button-width: 34px; --rdp-day_button-height: 34px; --rdp-day_button-border-radius: 9px; --rdp-selected-border: 2px solid #1158b8; --rdp-nav-height: 40px; --rdp-nav_button-width: 32px; --rdp-nav_button-height: 32px; width: 100%; font-size: 13px; }
+.reconciliation-date-popover .rdp-months, .reconciliation-date-popover .rdp-month, .reconciliation-date-popover .rdp-month_grid { width: 100%; max-width: none; }
+.reconciliation-date-popover .rdp-month_caption { justify-content: center; color: #14284f; font-size: 14px; }
+.reconciliation-date-popover .rdp-weekday { color: #78889f; font-size: 11px; }
+.reconciliation-date-popover .rdp-nav { gap: 2px; }
+.reconciliation-date-popover .rdp-button_previous, .reconciliation-date-popover .rdp-button_next { border-radius: 8px; color: #304466; }
+.reconciliation-date-popover .rdp-button_previous:hover:not(:disabled), .reconciliation-date-popover .rdp-button_next:hover:not(:disabled) { background: #f1f5fb; }
+.reconciliation-date-popover .rdp-chevron { fill: currentColor; }
+.reconciliation-date-popover .rdp-day_button { font-size: 13px; transition: background-color .12s ease, color .12s ease; }
+.reconciliation-date-popover .rdp-day_button:hover:not(:disabled) { background: #edf3fc; color: #1158b8; }
+.reconciliation-date-popover .rdp-selected .rdp-day_button { border-color: #1158b8; background: #1158b8; color: white; }
+.reconciliation-date-popover .rdp-today:not(.rdp-outside):not(.rdp-selected) .rdp-day_button { box-shadow: inset 0 0 0 1px #1158b8; }
+.reconciliation-date-popover .rdp-disabled:not(.rdp-selected) .rdp-day_button { cursor: not-allowed; }
+@keyframes reconciliation-calendar-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .reconciliation-date-trigger, .reconciliation-date-popover .rdp-day_button { transition: none; }
+  .reconciliation-date-popover { animation: none; }
+}
