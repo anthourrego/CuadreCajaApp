@@ -9,6 +9,14 @@
 Vite redirige las solicitudes `/api` al backend local; este proxy solo se aplica en desarrollo.
 Si el backend local usa otro puerto, establece la variable de entorno `API_PROXY_TARGET` antes de iniciar Vite, por ejemplo `http://127.0.0.1:8001`.
 
+## Estilos
+
+El frontend incorpora Tailwind CSS mediante su plugin de Vite. La migración es gradual: la estructura y la cabecera del espacio de trabajo usan utilidades de Tailwind, y la pantalla de acceso, la navegación lateral, el menú de usuario, las ventanas de perfil y contraseña, los botones, campos, tarjetas, listados compartidos y las pantallas de inicio, cuadres, sucursales, cajas, cuentas, usuarios, roles, ubicaciones y tipos de gasto usan utilidades mediante `@apply`. Los demás estilos existentes siguen en sus archivos CSS.
+
+Los colores de marca y los tokens compartidos de botones, campos y paneles se definen en `src/index.css`. Para utilizar estas utilidades con `@apply` desde otro archivo CSS, referencia ese archivo con `@reference "./index.css"`.
+
+Para evitar cambios globales durante la migración, se importan el tema y las utilidades de Tailwind sin Preflight. Los estilos CSS existentes no están en capas y tienen prioridad sobre las utilidades en caso de conflicto; al migrar un componente, retira las reglas equivalentes y comprueba su apariencia en escritorio y móvil. La navegación móvil conserva el punto de corte existente de 760 px.
+
 ## Producción
 
 Ejecuta `npm run build` en esta carpeta y publica el contenido de `dist` en la carpeta pública del sitio. La compilación utiliza `VITE_API_ORIGIN` de `.env.production` y envía las solicitudes a `https://apicaudrecaja.gomariwms.com/api`. La URL se incorpora al compilar: si se cambia, hay que volver a compilar. No incluyas secretos en variables `VITE_`, ya que son públicas.
@@ -23,7 +31,7 @@ La sección Cuentas está oculta temporalmente en el frontend mediante `accounts
 
 En el menú del usuario de la cabecera se puede editar el perfil, cambiar la contraseña o cerrar sesión. El nombre de usuario se define al crear la cuenta y no puede modificarse. Los formularios de perfil y contraseña se abren en ventanas modales que se pueden cancelar o cerrar con Escape. El cambio de contraseña exige la contraseña actual y cierra todas las sesiones.
 
-En pantallas pequeñas, la navegación se abre como un panel lateral desde el botón de menú y se cierra al seleccionar una opción, al tocar fuera o con Escape.
+En escritorio, el botón en el borde del menú permite contraerlo o expandirlo; contraído, las opciones muestran su nombre al pasar el cursor o enfocarlas con el teclado. En pantallas pequeñas, la navegación se abre como un panel lateral desde el botón de menú y se cierra al seleccionar una opción, al tocar fuera o con Escape.
 
 En Configuración > Roles se gestionan los permisos agrupados por módulo, indicando si son globales o por sucursal. Cada módulo permite seleccionar todos los permisos que el gestor puede delegar; los demás aparecen deshabilitados. En Configuración > Usuarios se asignan las sucursales a cada usuario. Para consultar cajas basta tener asignada la sucursal; las demás acciones requieren además el permiso correspondiente. La administración puede delegarse únicamente dentro del alcance propio; el rol administrador está protegido y mantiene acceso global. Los roles con usuarios asignados no se pueden eliminar.
 

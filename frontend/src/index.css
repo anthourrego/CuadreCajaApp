@@ -1,3 +1,30 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+@theme inline {
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-pink: var(--brand-pink);
+  --color-app-canvas: #fffdf3;
+  --color-app-text: #172441;
+  --color-panel-border: #e8edf5;
+  --color-control-border: #dfe5ef;
+  --color-control-text: #304466;
+  --color-control-hover: #5279ad;
+  --color-field-border: #dce4ef;
+  --color-field-readonly: #f3f5f8;
+  --color-field-readonly-text: #53647f;
+  --color-primary-hover: #245cbb;
+  --radius-control: 8px;
+  --radius-panel: 13px;
+  --text-control: 13px;
+  --spacing-control-x: 14px;
+  --spacing-control-y: 10px;
+}
+
 :root {
   font-family: "Segoe UI", Arial, sans-serif;
   color: #14213d;

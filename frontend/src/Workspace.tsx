@@ -242,7 +242,7 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
   ]
 
   return (
-    <div className={`workspace${sidebarCollapsed ? ' sidebar-collapsed' : ''}${mobileMenuOpen ? ' mobile-menu-open' : ''}`}>
+    <div className={`workspace flex min-h-[100svh] bg-app-canvas${sidebarCollapsed ? ' sidebar-collapsed' : ''}${mobileMenuOpen ? ' mobile-menu-open' : ''}`}>
       {mobileMenuOpen && <div className="sidebar-backdrop" aria-hidden="true" onClick={() => setMobileMenuOpen(false)} />}
       <aside ref={sidebarRef} id="workspace-sidebar" className="workspace-sidebar" role={mobileMenuOpen ? 'dialog' : undefined} aria-modal={mobileMenuOpen ? true : undefined} aria-label={mobileMenuOpen ? 'Menú de navegación' : undefined}>
         <div className="workspace-sidebar-top">
@@ -266,13 +266,17 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
         <p className="sidebar-label">ESPACIO DE TRABAJO</p>
         <nav className="workspace-nav" id="workspace-navigation" aria-label="Navegación principal">
           {sections.map((item) => (
-            <button type="button" key={item} title={labels[item]} aria-label={labels[item]} className={section === item ? 'selected' : ''} aria-current={section === item ? 'page' : undefined} onClick={() => navigate(item)}>
-              <span className="nav-icon" aria-hidden="true">{item === 'inicio' ? '⌂' : item === 'cuadres' ? '$' : '◈'}</span>
+            <button type="button" key={item} aria-label={labels[item]} className={section === item ? 'selected' : ''} aria-current={section === item ? 'page' : undefined} onClick={() => navigate(item)}>
+              <span className="nav-icon" aria-hidden="true">
+                {item === 'inicio' ? <svg viewBox="0 0 24 24" fill="none"><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9M9 20v-6h6v6" /></svg>
+                  : item === 'cuadres' ? <svg viewBox="0 0 24 24" fill="none"><rect x="5" y="4" width="14" height="17" rx="2" /><path d="M9 4.5h6M8 11l2 2 4-4M8 17h8" /></svg>
+                    : <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="6" width="18" height="14" rx="2" /><path d="M3 9h18M16 14h5" /><circle cx="16" cy="14" r=".7" /></svg>}
+              </span>
               <span className="nav-label">{labels[item]}</span>
             </button>
           ))}
           <div className="nav-group">
-              <button type="button" className={settingsSections.includes(section) ? 'nav-group-active' : ''} title="Configuración" aria-label="Configuración" aria-expanded={settingsOpen} aria-controls="settings-navigation" onClick={() => {
+              <button type="button" className={settingsSections.includes(section) ? 'nav-group-active' : ''} aria-label="Configuración" aria-expanded={settingsOpen} aria-controls="settings-navigation" onClick={() => {
                 if (sidebarCollapsed && window.matchMedia('(min-width: 761px)').matches) {
                   setSidebarCollapsed(false)
                   setSettingsOpen(true)
@@ -280,37 +284,37 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
                   setSettingsOpen((open) => !open)
                 }
               }}>
-                <span className="nav-icon" aria-hidden="true">⚙</span>
+                <span className="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M9.7 3.5h4.6l.5 2a7 7 0 0 1 1.6.9l2-.5 2.3 4-1.5 1.5v1.8l1.5 1.5-2.3 4-2-.5a7 7 0 0 1-1.6.9l-.5 2H9.7l-.5-2a7 7 0 0 1-1.6-.9l-2 .5-2.3-4 1.5-1.5v-1.8L3.3 9.9l2.3-4 2 .5a7 7 0 0 1 1.6-.9l.5-2Z" /><circle cx="12" cy="12" r="2.5" /></svg></span>
                 <span className="nav-label">Configuración</span>
                 <svg className={`nav-chevron${settingsOpen ? ' open' : ''}`} aria-hidden="true" viewBox="0 0 24 24" fill="none">
                   <path d="m6 9 6 6 6-6" />
                 </svg>
               </button>
               <div className="nav-submenu" id="settings-navigation" hidden={!settingsOpen}>
-                {canManageLocations && <button type="button" title="Ubicaciones" aria-label="Ubicaciones" className={section === 'ubicaciones' ? 'selected' : ''} aria-current={section === 'ubicaciones' ? 'page' : undefined} onClick={() => navigate('ubicaciones')}>
+                {canManageLocations && <button type="button" aria-label="Ubicaciones" className={section === 'ubicaciones' ? 'selected' : ''} aria-current={section === 'ubicaciones' ? 'page' : undefined} onClick={() => navigate('ubicaciones')}>
                   <span className="submenu-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none"><path d="M19 10c0 5-7 10-7 10S5 15 5 10a7 7 0 1 1 14 0Z" /><circle cx="12" cy="10" r="2.5" /></svg>
                   </span>
                   <span className="nav-label submenu-copy"><span>Ubicaciones</span><small>Departamentos y municipios</small></span>
                 </button>}
-                {canViewBranches && <button type="button" title="Sucursales" aria-label="Sucursales" className={section === 'sucursales' ? 'selected' : ''} aria-current={section === 'sucursales' ? 'page' : undefined} onClick={() => navigate('sucursales')}>
-                  <span className="submenu-icon" aria-hidden="true">▦</span>
+                {canViewBranches && <button type="button" aria-label="Sucursales" className={section === 'sucursales' ? 'selected' : ''} aria-current={section === 'sucursales' ? 'page' : undefined} onClick={() => navigate('sucursales')}>
+                  <span className="submenu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M4 21V7l8-4 8 4v14M2 21h20M9 21v-4h6v4M8 9h1m6 0h1M8 13h1m6 0h1" /></svg></span>
                   <span className="nav-label submenu-copy"><span>Sucursales</span><small>Puntos del negocio</small></span>
                 </button>}
-                <button type="button" title="Cajas" aria-label="Cajas" className={section === 'cajas' ? 'selected' : ''} aria-current={section === 'cajas' ? 'page' : undefined} onClick={() => navigate('cajas')}>
-                  <span className="submenu-icon" aria-hidden="true">▣</span>
+                <button type="button" aria-label="Cajas" className={section === 'cajas' ? 'selected' : ''} aria-current={section === 'cajas' ? 'page' : undefined} onClick={() => navigate('cajas')}>
+                  <span className="submenu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="10" width="18" height="10" rx="2" /><path d="M6 10V4h9v6M9 7h3M3 15h18M17 17.5h1" /></svg></span>
                   <span className="nav-label submenu-copy"><span>Cajas</span><small>Cajas por sucursal</small></span>
                 </button>
-                {canManageExpenseTypes && <button type="button" title="Tipos de gasto" aria-label="Tipos de gasto" className={section === 'tipos-gasto' ? 'selected' : ''} aria-current={section === 'tipos-gasto' ? 'page' : undefined} onClick={() => navigate('tipos-gasto')}>
-                  <span className="submenu-icon" aria-hidden="true">$</span>
+                {canManageExpenseTypes && <button type="button" aria-label="Tipos de gasto" className={section === 'tipos-gasto' ? 'selected' : ''} aria-current={section === 'tipos-gasto' ? 'page' : undefined} onClick={() => navigate('tipos-gasto')}>
+                  <span className="submenu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3Z" /><path d="M8 8h8M8 12h8M8 16h4" /></svg></span>
                   <span className="nav-label submenu-copy"><span>Tipos de gasto</span><small>Catálogo global</small></span>
                 </button>}
-                {canManageRoles && <button type="button" title="Roles" aria-label="Roles" className={section === 'roles' ? 'selected' : ''} aria-current={section === 'roles' ? 'page' : undefined} onClick={() => navigate('roles')}>
-                  <span className="submenu-icon" aria-hidden="true">♙</span>
+                {canManageRoles && <button type="button" aria-label="Roles" className={section === 'roles' ? 'selected' : ''} aria-current={section === 'roles' ? 'page' : undefined} onClick={() => navigate('roles')}>
+                  <span className="submenu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 19 6v5c0 4.5-2.8 7.7-7 10-4.2-2.3-7-5.5-7-10V6l7-3Z" /><path d="m9 12 2 2 4-4" /></svg></span>
                   <span className="nav-label submenu-copy"><span>Roles</span><small>Permisos por módulo</small></span>
                 </button>}
-                {canManageUsers && <button type="button" title="Usuarios" aria-label="Usuarios" className={section === 'usuarios' ? 'selected' : ''} aria-current={section === 'usuarios' ? 'page' : undefined} onClick={() => navigate('usuarios')}>
-                  <span className="submenu-icon" aria-hidden="true">♙</span>
+                {canManageUsers && <button type="button" aria-label="Usuarios" className={section === 'usuarios' ? 'selected' : ''} aria-current={section === 'usuarios' ? 'page' : undefined} onClick={() => navigate('usuarios')}>
+                  <span className="submenu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><circle cx="9" cy="8" r="3" /><path d="M3 20v-1a6 6 0 0 1 12 0v1M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5v1" /></svg></span>
                   <span className="nav-label submenu-copy"><span>Usuarios</span><small>Personas con acceso</small></span>
                 </button>}
               </div>
@@ -319,8 +323,8 @@ function Workspace({ token, user, onUserUpdated, onSessionExpired, onPasswordCha
         <div className="sidebar-bottom"><span className="sidebar-dot" /> Tu negocio, en orden</div>
       </aside>
 
-      <div className="workspace-body">
-        <header className="workspace-header">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="workspace-header flex min-h-[68px] items-center justify-between gap-5 border-0 border-b border-solid border-panel-border bg-white px-[5%] py-3 [@media(max-width:760px)]:min-h-[64px] [@media(max-width:760px)]:gap-3 [@media(max-width:760px)]:px-[6%] [@media(max-width:760px)]:py-2.5">
           <div className="header-heading">
             <button ref={mobileMenuButtonRef} className="mobile-menu-button" type="button" aria-label="Abrir menú" aria-expanded={mobileMenuOpen} aria-controls="workspace-sidebar" onClick={() => setMobileMenuOpen(true)}>
               <svg aria-hidden="true" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" /></svg>

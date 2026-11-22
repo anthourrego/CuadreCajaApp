@@ -1,10 +1,12 @@
-.location-tabs { display: flex; gap: 8px; padding: 18px 24px 0; }
-.location-tabs button { border: 1px solid #dfe5ef; border-radius: 8px; padding: 9px 14px; background: #fff; color: #53647f; font-weight: 700; }
-.location-tabs button.selected { background: #14284f; border-color: #14284f; color: #fff; }
-.location-filter { padding: 20px 24px 0; max-width: 470px; }
-.location-management select { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #dce4ef; border-radius: 8px; color: #172441; background: #fff; }
-.location-toolbar .user-field { width: min(100%, 350px); }
+@reference "./index.css";
+
+.location-tabs { @apply flex gap-2 px-6 pt-[18px] pb-0; }
+.location-tabs button { @apply rounded-control border border-solid border-control-border bg-white px-[14px] py-[9px] font-bold text-field-readonly-text; }
+.location-tabs button.selected { @apply border-brand-navy bg-brand-navy text-white; }
+.location-filter { @apply max-w-[470px] px-6 pt-5 pb-0; }
+.location-management select { @apply w-full min-h-11 rounded-control border border-solid border-field-border bg-white px-3 py-2.5 text-app-text; }
+.location-toolbar .user-field { @apply w-[min(100%,350px)]; }
 @media (max-width: 760px) {
-  .location-tabs { padding: 18px 16px 0; }
-  .location-filter { padding: 20px 16px 0; }
+  .location-tabs { @apply px-4 pt-[18px] pb-0; }
+  .location-filter { @apply px-4 pt-5 pb-0; }
 }
